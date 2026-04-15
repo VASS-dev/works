@@ -25,6 +25,7 @@
     {% set fs = row.fact_signed[loop.index0] %}
     {% set approved = st == 'approved' %}
     <td class="px-1 py-1 {% if approved %}bg-emerald-50{% else %}bg-blue-50/50{% endif %}">
+      <div class="flex flex-col items-end">
       {% if approved %}
         <div class="w-24 text-right tabular-nums px-2 py-1 text-sm text-emerald-800 font-medium flex items-center justify-end gap-1" title="Утверждено">
           <span>🔒</span>
@@ -47,6 +48,7 @@
                  class="w-24 text-right tabular-nums border rounded px-2 py-1 text-sm bg-white focus:bg-yellow-50 focus:outline-blue-400">
         </form>
       {% endif %}
+      </div>
     </td>
   {% endfor %}
 
