@@ -22,6 +22,7 @@ from app.services.balances import balance, balance_bulk
 from app.services.pricing import unit_price
 from app.services.statuses import ExecutionStatus, PlanStatus
 from app.services import export as export_svc
+from app.services import forms as forms_svc
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
@@ -173,6 +174,67 @@ def export_dashboard_xlsx(
     finally:
         s.close()
     return _xlsx_response(data, "dashboard.xlsx")
+
+
+# ── Страница форм ────────────────────────────────────────────────────────────
+
+@app.get("/forms", response_class=HTMLResponse)
+def forms_page(request: Request):
+    s = SessionLocal()
+    try:
+        contracts = s.query(Contract).order_by(Contract.counterparty).all()
+        today_period = date.today().strftime("%Y-%m")
+    finally:
+        s.close()
+    return TEMPLATES.TemplateResponse("forms.html", {
+        "request": request,
+        "contracts": contracts,
+        "today_period": today_period,
+    })
+
+
+@app.get("/export/form/work_order")
+def export_form_work_order(
+    period: str = Query(...),
+    contract_id: str = Query(...),
+):
+    s = SessionLocal()
+    try:
+        cid = int(contract_id)
+        data = forms_svc.export_work_order(s, period=period, contract_id=cid)
+        c = s.get(Contract, cid)
+        name = (c.contract_no or c.number or "zadanie").replace("/", "-")
+    finally:
+        s.close()
+    return _xlsx_response(data, f"zadanie-{name}-{period}.xlsx")
+
+
+@app.get("/export/form/monthly_plan")
+def export_form_monthly_plan(
+    period: str = Query(...),
+    contract_id: Optional[str] = None,
+):
+    s = SessionLocal()
+    try:
+        cid = int(contract_id) if contract_id else None
+        data = forms_svc.export_monthly_plan_form(s, period=period, contract_id=cid)
+    finally:
+        s.close()
+    return _xlsx_response(data, f"plan-{period}.xlsx")
+
+
+@app.get("/export/form/progress_report")
+def export_form_progress_report(
+    period: str = Query(...),
+    contract_id: Optional[str] = None,
+):
+    s = SessionLocal()
+    try:
+        cid = int(contract_id) if contract_id else None
+        data = forms_svc.export_progress_report(s, period=period, contract_id=cid)
+    finally:
+        s.close()
+    return _xlsx_response(data, f"otchet-{period}.xlsx")
 
 
 def get_session() -> Session:

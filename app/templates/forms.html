@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-2xl mx-auto">
+
+  <div class="mb-6">
+    <h1 class="text-lg font-semibold text-slate-900">Печатные формы</h1>
+    <p class="text-sm text-slate-500 mt-0.5">Скачайте готовый Excel-документ для печати или передачи</p>
+  </div>
+
+  {# ── ФОРМА 1: Задание на производство работ ── #}
+  <div class="card mb-4 overflow-hidden">
+    <div class="px-5 py-4 border-b bg-slate-50 flex items-start gap-3">
+      <div class="w-8 h-8 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold shrink-0 mt-0.5">1</div>
+      <div>
+        <div class="font-semibold text-slate-900">Задание на производство работ</div>
+        <div class="text-xs text-slate-500 mt-0.5">Для прораба / подрядчика. Перечень работ с плановыми объёмами, ценами и суммой на месяц. Блок подписей «Выдал / Принял».</div>
+      </div>
+    </div>
+    <form method="get" action="/export/form/work_order" class="px-5 py-4 flex flex-wrap gap-3 items-end">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Месяц</label>
+        <input type="month" name="period" value="{{ today_period }}" required
+               class="border rounded px-2 py-1.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Договор (обязательно)</label>
+        <select name="contract_id" required class="border rounded px-2 py-1.5 text-sm w-80">
+          <option value="">— выберите договор —</option>
+          {% for c in contracts %}
+            <option value="{{ c.id }}">{{ c.counterparty or "—" }} — {{ c.contract_no or c.number }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-1.5 font-medium">↓ Скачать</button>
+    </form>
+  </div>
+
+  {# ── ФОРМА 2: Сводный производственный план ── #}
+  <div class="card mb-4 overflow-hidden">
+    <div class="px-5 py-4 border-b bg-slate-50 flex items-start gap-3">
+      <div class="w-8 h-8 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold shrink-0 mt-0.5">2</div>
+      <div>
+        <div class="font-semibold text-slate-900">Сводный производственный план</div>
+        <div class="text-xs text-slate-500 mt-0.5">Для руководства. Все плановые работы за месяц по всем (или одному) договору. Группировка по контрагентам, промежуточные и общий итог.</div>
+      </div>
+    </div>
+    <form method="get" action="/export/form/monthly_plan" class="px-5 py-4 flex flex-wrap gap-3 items-end">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Месяц</label>
+        <input type="month" name="period" value="{{ today_period }}" required
+               class="border rounded px-2 py-1.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Договор (необязательно)</label>
+        <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-80">
+          <option value="">— все договоры —</option>
+          {% for c in contracts %}
+            <option value="{{ c.id }}">{{ c.counterparty or "—" }} — {{ c.contract_no or c.number }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-1.5 font-medium">↓ Скачать</button>
+    </form>
+  </div>
+
+  {# ── ФОРМА 3: Оперативный отчёт о выполнении ── #}
+  <div class="card mb-4 overflow-hidden">
+    <div class="px-5 py-4 border-b bg-slate-50 flex items-start gap-3">
+      <div class="w-8 h-8 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold shrink-0 mt-0.5">3</div>
+      <div>
+        <div class="font-semibold text-slate-900">Оперативный отчёт о выполнении работ</div>
+        <div class="text-xs text-slate-500 mt-0.5">Для руководства. План vs факт за месяц: объёмы, суммы, % выполнения, статус подписания. Подписанные акты выделены цветом.</div>
+      </div>
+    </div>
+    <form method="get" action="/export/form/progress_report" class="px-5 py-4 flex flex-wrap gap-3 items-end">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Месяц</label>
+        <input type="month" name="period" value="{{ today_period }}" required
+               class="border rounded px-2 py-1.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Договор (необязательно)</label>
+        <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-80">
+          <option value="">— все договоры —</option>
+          {% for c in contracts %}
+            <option value="{{ c.id }}">{{ c.counterparty or "—" }} — {{ c.contract_no or c.number }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-1.5 font-medium">↓ Скачать</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

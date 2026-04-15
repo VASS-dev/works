@@ -27,7 +27,7 @@
   <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-64 shrink-0">
     <option value="">— все договоры —</option>
     {% for c in contracts %}
-      <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>{{ c.number }} — {{ c.counterparty or "—" }}</option>
+      <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>{{ c.counterparty or "—" }} — {{ c.contract_no or c.number }}</option>
     {% endfor %}
   </select>
   <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-1.5 font-medium shrink-0">Применить</button>
@@ -45,29 +45,25 @@
   {% set dp = (g.done_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
   {% set sp = (g.signed_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
   <details class="mb-3 card">
-    <summary class="cursor-pointer px-4 py-3 flex items-start gap-4 hover:bg-slate-50">
-      <div class="flex-1 min-w-0">
-        <div class="flex items-baseline gap-2 flex-wrap">
-          <span class="font-semibold text-slate-900">{{ c.counterparty or "—" }}</span>
-          {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono">{{ c.contract_no }}{% if c.contract_date %} · {{ c.contract_date.strftime('%d.%m.%Y') }}{% endif %}</span>{% endif %}
+    <summary class="cursor-pointer px-4 py-3 flex items-center gap-4 hover:bg-slate-50">
+      <div class="flex-1 min-w-0 overflow-hidden">
+        <div class="flex items-center gap-2 overflow-hidden">
+          <span class="font-semibold text-slate-900 truncate">{{ c.counterparty or "—" }}</span>
+          {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono shrink-0">{{ c.contract_no }}</span>{% endif %}
         </div>
         <div class="text-xs text-slate-500 truncate">{{ c.project or "" }}</div>
       </div>
-      <div class="hidden md:flex flex-col gap-1 w-64 shrink-0">
-        <div class="flex justify-between text-[11px] text-slate-500">
-          <span class="tabular-nums">{{ rub(g.ordered_rub) }}</span>
-          <span class="text-emerald-700 tabular-nums">{{ "%.0f"|format(dp) }}% выполн.</span>
+      <div class="hidden md:flex flex-col justify-center gap-1.5 w-56 shrink-0">
+        <div class="flex justify-between text-xs">
+          <span class="text-slate-600 tabular-nums font-medium">{{ rub(g.ordered_rub) }}</span>
+          <span class="text-emerald-700 tabular-nums">{{ "%.0f"|format(dp) }}%</span>
         </div>
         <div class="relative w-full h-1 bg-slate-100 rounded-full overflow-hidden">
           <div class="absolute inset-y-0 left-0 bg-emerald-200" style="width: {{ dp if dp <= 100 else 100 }}%"></div>
           <div class="absolute inset-y-0 left-0 bg-emerald-600" style="width: {{ sp if sp <= 100 else 100 }}%"></div>
         </div>
-        <div class="flex justify-between text-[10px] text-slate-400">
-          <span>план <span class="text-slate-600 font-medium tabular-nums">{{ rub(g.plan_rub) }}</span></span>
-          <span>подпис. <span class="text-emerald-700 font-medium tabular-nums">{{ rub(g.signed_rub) }}</span></span>
-        </div>
       </div>
-      <span class="text-xs text-slate-400 whitespace-nowrap">{{ g.rows|length }} работ{% if g.closed_n %} · {{ g.closed_n }} закрытых{% endif %}</span>
+      <span class="text-xs text-slate-400 whitespace-nowrap text-right w-36 shrink-0">{{ g.rows|length }} работ{% if g.closed_n %} · {{ g.closed_n }} закрыт.{% endif %}</span>
     </summary>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">

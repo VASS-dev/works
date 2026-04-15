@@ -27,8 +27,8 @@
   <form method="get" action="/dashboard" class="card p-2 flex gap-2 items-center">
     <div class="flex items-center gap-1">
       <a href="?start={{ prev_start }}&n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none">←</a>
-      <input name="start" value="{% if not all_periods %}{{ start }}{% endif %}" placeholder="{{ today_period }}"
-             class="border rounded px-2 py-1.5 text-sm w-24 text-center">
+      <input type="month" name="start" value="{% if not all_periods %}{{ start }}{% endif %}"
+             class="border rounded px-2 py-1.5 text-sm">
       <a href="?n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none">•</a>
       <a href="?start={{ next_start }}&n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none">→</a>
     </div>

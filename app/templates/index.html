@@ -28,16 +28,14 @@
   <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-60 shrink-0">
     <option value="">— все договоры —</option>
     {% for c in contracts %}
-      <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>
-        {{ c.number }} — {{ c.counterparty or "—" }}
-      </option>
+      <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>{{ c.counterparty or "—" }} — {{ c.contract_no or c.number }}</option>
     {% endfor %}
   </select>
   <div class="flex items-center gap-1 shrink-0">
     <a href="?start={{ prev_start }}&n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
        class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none" title="Предыдущий месяц">←</a>
-    <input name="start" value="{{ start }}" placeholder="{{ today_period }}"
-           class="border rounded px-2 py-1.5 text-sm w-24 text-center">
+    <input type="month" name="start" value="{{ start }}"
+           class="border rounded px-2 py-1.5 text-sm">
     <a href="?n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
        class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none" title="Сегодня">•</a>
     <a href="?start={{ next_start }}&n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
@@ -115,10 +113,10 @@
   {% set sp = [[(gsigned / gord * 100) if gord else 0, 0]|max, 100]|min %}
   <details class="mb-3 card">
     <summary class="cursor-pointer px-4 py-3 flex items-center gap-4 hover:bg-slate-50">
-      <div class="flex-1 min-w-0">
-        <div class="flex items-baseline gap-2 flex-wrap">
-          <span class="font-semibold text-slate-900">{{ c.counterparty or "—" }}</span>
-          {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono">{{ c.contract_no }}</span>{% endif %}
+      <div class="flex-1 min-w-0 overflow-hidden">
+        <div class="flex items-center gap-2 overflow-hidden">
+          <span class="font-semibold text-slate-900 truncate">{{ c.counterparty or "—" }}</span>
+          {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono shrink-0">{{ c.contract_no }}</span>{% endif %}
         </div>
         <div class="text-xs text-slate-500 truncate">{{ c.project or "" }}</div>
       </div>

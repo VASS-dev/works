@@ -14,7 +14,7 @@
     <div class="max-w-[1600px] mx-auto px-6 h-12 flex items-center justify-between gap-6">
       <div class="text-sm font-semibold text-slate-800 select-none">План работ</div>
       <nav class="text-sm flex gap-1 bg-slate-100 rounded-lg p-1">
-        {% set nav = [('/', 'План'), ('/execution', 'Исполнение'), ('/dashboard', 'Дашборд'), ('/contracts', 'Договоры')] %}
+        {% set nav = [('/', 'План'), ('/execution', 'Исполнение'), ('/dashboard', 'Дашборд'), ('/contracts', 'Договоры'), ('/forms', 'Формы')] %}
         {% for href, label in nav %}
           {% set active = (href == '/' and path == '/') or (href != '/' and path.startswith(href)) %}
           <a href="{{ href }}" class="px-3 py-1.5 rounded-md font-medium transition {% if active %}bg-white text-slate-900 shadow-sm{% else %}text-slate-500 hover:text-slate-800{% endif %}">{{ label }}</a>
