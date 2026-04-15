@@ -203,10 +203,11 @@ def load_rows(session: Session, periods: list[str], contract_id: Optional[int], 
             for ex in session.query(ExecutionEntry).filter(ExecutionEntry.plan_entry_id.in_(plan_ids)).all()
         }
 
+    balances_map = balance_bulk(session, [ol.id for ol in order_lines])
     groups: dict[int, dict] = {}
     hidden = 0
     for ol in order_lines:
-        b = balance(session, ol.id)
+        b = balances_map.get(ol.id) or balance(session, ol.id)
         closed = b.qty_remaining is not None and b.qty_remaining <= 0
         g = groups.setdefault(ol.contract_id, {
             "contract": ol.contract, "rows": [],
