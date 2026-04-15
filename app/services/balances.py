@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Act, ActLine, ExecutionEntry, OrderLine, PlanEntry
+from app.services.statuses import ExecutionStatus
 
 
 @dataclass
@@ -57,7 +58,7 @@ def balance(session: Session, order_line_id: int) -> Balance:
         func.count(ExecutionEntry.id),
     ).join(PlanEntry, ExecutionEntry.plan_entry_id == PlanEntry.id).filter(
         PlanEntry.order_line_id == order_line_id,
-        ExecutionEntry.status == "signed",
+        ExecutionEntry.status == ExecutionStatus.SIGNED,
         ExecutionEntry.act_line_id.is_(None),
     ).one()
 
@@ -129,7 +130,7 @@ def balance_bulk(session: Session, order_line_ids: list[int]) -> dict[int, Balan
         func.count(ExecutionEntry.id),
     ).join(PlanEntry, ExecutionEntry.plan_entry_id == PlanEntry.id).filter(
         PlanEntry.order_line_id.in_(order_line_ids),
-        ExecutionEntry.status == "signed",
+        ExecutionEntry.status == ExecutionStatus.SIGNED,
         ExecutionEntry.act_line_id.is_(None),
     ).group_by(PlanEntry.order_line_id).all()
     signed_map = {r[0]: (float(r[1]), float(r[2]), int(r[3])) for r in exec_rows}

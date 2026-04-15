@@ -20,6 +20,7 @@ from app.models import ActLine, Contract, ExecutionEntry, OrderLine, PlanEntry, 
 from sqlalchemy.orm import joinedload
 from app.services.balances import balance, balance_bulk
 from app.services.pricing import unit_price
+from app.services.statuses import ExecutionStatus, PlanStatus
 from app.services import export as export_svc
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -257,9 +258,9 @@ def load_rows(session: Session, periods: list[str], contract_id: Optional[int], 
         unit = unit_price(ol)
         plans = [plans_by_key.get((ol.id, p)) for p in periods]
         plan_values = [(pe.plan_qty if pe else None) for pe in plans]
-        plan_statuses = [(pe.status if pe else "draft") for pe in plans]
+        plan_statuses = [(pe.status if pe else PlanStatus.DRAFT) for pe in plans]
         fact_values = [(ex_by_plan.get(pe.id).qty_fact if pe and ex_by_plan.get(pe.id) else None) for pe in plans]
-        fact_signed = [(ex_by_plan.get(pe.id).status == "signed" if pe and ex_by_plan.get(pe.id) else False) for pe in plans]
+        fact_signed = [(ex_by_plan.get(pe.id).status == ExecutionStatus.SIGNED if pe and ex_by_plan.get(pe.id) else False) for pe in plans]
         plan_sum = sum((pv or 0) for pv, fs in zip(plan_values, fact_signed) if not fs)
         signed_rub = sum(((fv or 0) * unit) for fv, fs in zip(fact_values, fact_signed) if fs)
         g["signed_rub"] += signed_rub
@@ -372,7 +373,7 @@ def upsert_plan(
         .filter_by(order_line_id=order_line_id, period=period)
         .one_or_none()
     )
-    if pe is not None and pe.status == "approved":
+    if pe is not None and pe.status == PlanStatus.APPROVED:
         raise HTTPException(409, "План утверждён, сначала снимите утверждение.")
     if pe is None and qty_val is not None:
         pe = PlanEntry(order_line_id=order_line_id, period=period, plan_qty=qty_val)
@@ -397,7 +398,7 @@ def upsert_plan(
             for ex in session.query(ExecutionEntry).filter(ExecutionEntry.plan_entry_id.in_(plan_ids)).all()
         }
     fact_values = [(ex_by_plan.get(plans[p].id).qty_fact if plans.get(p) and ex_by_plan.get(plans[p].id) else None) for p in periods]
-    fact_signed = [(ex_by_plan.get(plans[p].id).status == "signed" if plans.get(p) and ex_by_plan.get(plans[p].id) else False) for p in periods]
+    fact_signed = [(ex_by_plan.get(plans[p].id).status == ExecutionStatus.SIGNED if plans.get(p) and ex_by_plan.get(plans[p].id) else False) for p in periods]
     plan_sum = sum((pv or 0) for pv, fs in zip(plan_values, fact_signed) if not fs)
     b = balance(session, order_line_id)
 
@@ -420,11 +421,11 @@ def approve_period(
     now = datetime.utcnow()
     to_approve = (
         session.query(PlanEntry)
-        .filter(PlanEntry.period == period, PlanEntry.status == "draft")
+        .filter(PlanEntry.period == period, PlanEntry.status == PlanStatus.DRAFT)
         .all()
     )
     for pe in to_approve:
-        pe.status = "approved"
+        pe.status = PlanStatus.APPROVED
         pe.approved_at = now
         pe.approved_by = approved_by
         exists = session.query(ExecutionEntry).filter_by(plan_entry_id=pe.id).one_or_none()
@@ -471,8 +472,8 @@ def dashboard(
         plan_sum = (pe.plan_sum or 0.0) or plan_qty * unit
         fact_qty = (ex.qty_fact or 0.0) if ex else 0.0
         fact_sum = (ex.sum_fact or 0.0) if ex else 0.0
-        signed = bool(ex and ex.status == "signed")
-        approved = pe.status == "approved"
+        signed = bool(ex and ex.status == ExecutionStatus.SIGNED)
+        approved = pe.status == PlanStatus.APPROVED
 
         p = by_period.setdefault(pe.period, {
             "period": pe.period, "label": ru_month(pe.period),
@@ -532,7 +533,7 @@ def dashboard(
     total_acts = float(session.query(func.coalesce(func.sum(ActLine.sum), 0.0)).scalar() or 0.0)
     total_signed_exec = float(
         session.query(func.coalesce(func.sum(ExecutionEntry.sum_fact), 0.0))
-        .filter(ExecutionEntry.status == "signed", ExecutionEntry.act_line_id.is_(None))
+        .filter(ExecutionEntry.status == ExecutionStatus.SIGNED, ExecutionEntry.act_line_id.is_(None))
         .scalar() or 0.0
     )
     snapshot_done = float(session.query(func.coalesce(func.sum(OrderLine.sum_done_snapshot), 0.0)).scalar() or 0.0)
@@ -600,7 +601,7 @@ def contracts_page(
         func.coalesce(func.sum(ExecutionEntry.qty_fact), 0.0),
     ).join(ExecutionEntry, ExecutionEntry.plan_entry_id == PlanEntry.id).filter(
         PlanEntry.order_line_id.in_(all_ol_ids),
-        ExecutionEntry.status == "signed",
+        ExecutionEntry.status == ExecutionStatus.SIGNED,
         ExecutionEntry.act_line_id.is_(None),
     ).group_by(PlanEntry.order_line_id).all() if all_ol_ids else []
     signed_qty_map = {r[0]: float(r[1]) for r in signed_rows}
@@ -740,7 +741,7 @@ def upsert_execution(
     ex = session.get(ExecutionEntry, execution_id)
     if ex is None:
         raise HTTPException(404, "execution not found")
-    if ex.status == "signed":
+    if ex.status == ExecutionStatus.SIGNED:
         raise HTTPException(409, "Запись подписана актом, правки невозможны.")
 
     def _num(s: str) -> Optional[float]:
@@ -775,7 +776,7 @@ def sign_execution(
     ex = session.get(ExecutionEntry, execution_id)
     if ex is None:
         raise HTTPException(404, "execution not found")
-    ex.status = "signed"
+    ex.status = ExecutionStatus.SIGNED
     ex.signed_at = datetime.utcnow()
     ex.signed_by = signed_by
     session.commit()
@@ -797,7 +798,7 @@ def unsign_execution(
     ex = session.get(ExecutionEntry, execution_id)
     if ex is None:
         raise HTTPException(404, "execution not found")
-    ex.status = "draft"
+    ex.status = ExecutionStatus.DRAFT
     ex.signed_at = None
     ex.signed_by = None
     ex.act_line_id = None
@@ -823,13 +824,13 @@ def sign_execution_bulk(
         session.query(ExecutionEntry)
         .join(PlanEntry, ExecutionEntry.plan_entry_id == PlanEntry.id)
         .join(OrderLine, PlanEntry.order_line_id == OrderLine.id)
-        .filter(PlanEntry.period == period, ExecutionEntry.status == "draft")
+        .filter(PlanEntry.period == period, ExecutionEntry.status == PlanStatus.DRAFT)
     )
     if contract_id:
         qset = qset.filter(OrderLine.contract_id == contract_id)
     count = 0
     for ex in qset.all():
-        ex.status = "signed"
+        ex.status = ExecutionStatus.SIGNED
         ex.signed_at = now
         ex.signed_by = signed_by
         count += 1
@@ -844,8 +845,8 @@ def unfreeze_period(
 ):
     count = (
         session.query(PlanEntry)
-        .filter(PlanEntry.period == period, PlanEntry.status == "approved")
-        .update({"status": "draft", "approved_at": None, "approved_by": None},
+        .filter(PlanEntry.period == period, PlanEntry.status == PlanStatus.APPROVED)
+        .update({"status": PlanStatus.DRAFT, "approved_at": None, "approved_by": None},
                 synchronize_session=False)
     )
     session.commit()

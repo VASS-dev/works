@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import ActLine, Contract, ExecutionEntry, OrderLine, PlanEntry, WorkType
 from app.services.balances import balance
 from app.services.pricing import unit_price
+from app.services.statuses import ExecutionStatus, PlanStatus
 
 
 HEADER_FILL = PatternFill("solid", fgColor="E2E8F0")
@@ -84,7 +85,7 @@ def export_contracts(session: Session, contract_id: Optional[int] = None, q: Opt
             if pe_ids:
                 signed_qty = session.query(func.coalesce(func.sum(ExecutionEntry.qty_fact), 0.0)).filter(
                     ExecutionEntry.plan_entry_id.in_(pe_ids),
-                    ExecutionEntry.status == "signed",
+                    ExecutionEntry.status == ExecutionStatus.SIGNED,
                     ExecutionEntry.act_line_id.is_(None),
                 ).scalar() or 0.0
                 signed_rub = float(signed_qty) * unit
@@ -157,7 +158,7 @@ def export_plan(session: Session, periods: list[str], contract_id: Optional[int]
                 (float(pe.plan_qty) if pe and pe.plan_qty is not None else None),
                 (pe.status if pe else None),
                 (float(ex.qty_fact) if ex and ex.qty_fact is not None else None),
-                ("да" if ex and ex.status == "signed" else ""),
+                ("да" if ex and ex.status == ExecutionStatus.SIGNED else ""),
             ]
         ws.append(row)
     _autofit(ws)
@@ -208,7 +209,7 @@ def export_execution(session: Session, period: str, contract_id: Optional[int] =
             float(plan_qty), float(plan_sum),
             float(fact_qty), float(fact_sum),
             round(pct, 1),
-            ("подписан" if ex.status == "signed" else "черновик"),
+            ("подписан" if ex.status == ExecutionStatus.SIGNED else "черновик"),
             ex.note or "",
         ])
     _autofit(ws)
@@ -234,8 +235,8 @@ def export_dashboard(session: Session, periods_filter: Optional[list[str]]) -> b
         plan_qty = pe.plan_qty or 0.0
         plan_sum = (pe.plan_sum or 0.0) or plan_qty * unit
         fact_sum = (ex.sum_fact or 0.0) if ex else 0.0
-        signed = bool(ex and ex.status == "signed")
-        approved = pe.status == "approved"
+        signed = bool(ex and ex.status == ExecutionStatus.SIGNED)
+        approved = pe.status == PlanStatus.APPROVED
 
         p = by_period.setdefault(pe.period, {"period": pe.period, "plan_draft": 0.0, "plan_approved": 0.0, "fact": 0.0, "signed": 0.0})
         k = by_contract.setdefault(c.id, {"contract": c, "plan": 0.0, "fact": 0.0, "signed": 0.0})
