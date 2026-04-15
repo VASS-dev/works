@@ -5,7 +5,7 @@
 {% set fact_sum = ex.sum_fact or 0 %}
 {% set pct = (fact_sum / plan_sum * 100) if plan_sum else ((fact / plan * 100) if plan else 0) %}
 {% set signed = ex.status == 'signed' %}
-<tr id="exrow-{{ ex.id }}" class="border-t hover:bg-slate-50 {% if signed %}bg-emerald-50/40{% endif %}"
+<tr id="exrow-{{ ex.id }}" class="border-t hover:bg-slate-50 {% if signed %}bg-emerald-50/30{% endif %}"
     hx-post="/api/execution" hx-target="#exrow-{{ ex.id }}" hx-swap="outerHTML"
     hx-trigger="change from:(#exrow-{{ ex.id }} input)"
     hx-include="#exrow-{{ ex.id }} input">
@@ -13,55 +13,55 @@
     <input type="hidden" name="execution_id" value="{{ ex.id }}">
     <div class="text-slate-800">{{ ol.description }}</div>
   </td>
-  <td class="px-2 py-2 text-right tabular-nums text-slate-700">
+  <td class="px-2 py-2 text-right tabular-nums text-slate-600">
     {{ "%.2f"|format(plan) }}
   </td>
   <td class="px-2 py-2 text-right tabular-nums text-slate-700">
     {{ "{:,.0f}".format(plan_sum or 0).replace(",", " ") }} ₽
   </td>
   {% if signed %}
-    <td class="px-2 py-2 text-right tabular-nums text-emerald-800 font-medium" title="Подписано актом">
-      🔒 {{ "%.2f"|format(fact) }}
+    <td class="px-2 py-2 text-right tabular-nums text-emerald-800 font-medium">
+      {{ "%.2f"|format(fact) }}
     </td>
     <td class="px-2 py-2 text-right tabular-nums text-emerald-800">
       {% if ex.sum_fact is not none %}{{ "{:,.0f}".format(ex.sum_fact).replace(",", " ") }} ₽{% endif %}
     </td>
-    <td class="px-2 py-2 text-right tabular-nums">{{ "%.0f"|format(pct) }}%</td>
-    <td class="px-2 py-2 text-slate-600 text-xs">{{ ex.note or "" }}</td>
+    <td class="px-2 py-2 text-right tabular-nums text-sm">{{ "%.0f"|format(pct) }}%</td>
+    <td class="px-2 py-2 text-slate-500 text-xs">{{ ex.note or "" }}</td>
     <td class="px-2 py-2 text-xs">
-      <div class="text-emerald-700">подписан</div>
+      <div class="text-emerald-700 font-medium">подписан</div>
       {% if ex.signed_by %}<div class="text-slate-400 text-[10px]">{{ ex.signed_by }}{% if ex.signed_at %} · {{ ex.signed_at.strftime('%d.%m %H:%M') }}{% endif %}</div>{% endif %}
       <button type="button"
               hx-post="/api/execution/unsign" hx-target="#exrow-{{ ex.id }}" hx-swap="outerHTML"
               hx-vals='{"execution_id":"{{ ex.id }}"}'
               hx-confirm="Снять подпись с этого планового акта?"
-              class="text-xs text-slate-500 hover:underline mt-1">🔓 снять</button>
+              class="text-[11px] text-slate-400 hover:text-slate-700 hover:underline mt-0.5">снять</button>
     </td>
   {% else %}
     <td class="px-2 py-1 text-right">
       <input type="text" name="qty_fact"
              value="{% if ex.qty_fact is not none %}{{ '%.2f'|format(ex.qty_fact) }}{% endif %}"
              inputmode="decimal"
-             class="w-24 text-right tabular-nums border rounded px-2 py-1 text-sm bg-white focus:bg-yellow-50 focus:outline-blue-400">
+             class="w-24 text-right tabular-nums border rounded px-2 py-1 text-sm bg-white">
     </td>
-    <td class="px-2 py-2 text-right tabular-nums text-slate-700">
-      {% if ex.sum_fact is not none %}{{ "{:,.0f}".format(ex.sum_fact).replace(",", " ") }} ₽{% else %}<span class="text-slate-400">—</span>{% endif %}
+    <td class="px-2 py-2 text-right tabular-nums text-slate-600">
+      {% if ex.sum_fact is not none %}{{ "{:,.0f}".format(ex.sum_fact).replace(",", " ") }} ₽{% else %}<span class="text-slate-300">—</span>{% endif %}
     </td>
     <td class="px-2 py-2 text-right tabular-nums text-xs {% if pct > 100 %}text-red-600 font-semibold{% elif pct >= 100 %}text-emerald-700{% elif pct > 0 %}text-slate-600{% else %}text-slate-400{% endif %}">
       {% if plan %}{{ "%.0f"|format(pct) }}%{% else %}—{% endif %}
     </td>
     <td class="px-2 py-1">
       <input type="text" name="note" value="{{ ex.note or '' }}"
-             class="w-full border rounded px-2 py-1 text-xs bg-white focus:bg-yellow-50 focus:outline-blue-400">
+             class="w-full border rounded px-2 py-1 text-xs bg-white">
     </td>
     <td class="px-2 py-2 text-xs">
-      <div class="text-slate-500">черновик</div>
+      <div class="text-slate-400">черновик</div>
       {% if ex.qty_fact is not none %}
       <button type="button"
               hx-post="/api/execution/sign" hx-target="#exrow-{{ ex.id }}" hx-swap="outerHTML"
               hx-vals='{"execution_id":"{{ ex.id }}"}'
               hx-confirm="Подписать плановый акт? Правки будут заблокированы."
-              class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded px-2 py-0.5 mt-1 font-medium">🔒 подписать</button>
+              class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white rounded px-2 py-0.5 mt-0.5 font-medium">Подписать</button>
       {% endif %}
     </td>
   {% endif %}

@@ -12,7 +12,7 @@ input[type="text"], input[type="number"], select {
 input[type="text"]:focus, input[type="number"]:focus, select:focus {
   outline: none;
   border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
 /* Details disclosure arrow */
@@ -23,16 +23,19 @@ details > summary::before {
   display: inline-block;
   margin-right: 8px;
   transition: transform 0.2s;
-  color: #94a3b8;
-  font-size: 0.85em;
+  color: #cbd5e1;
+  font-size: 0.8em;
 }
-details[open] > summary::before { transform: rotate(90deg); color: #6366f1; }
+details[open] > summary::before { transform: rotate(90deg); color: #94a3b8; }
 
-/* Card polish */
-.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03); }
+/* Card */
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.5rem; }
 
-/* Table zebra + hover */
+/* Table rows */
 tbody tr { transition: background 0.1s; }
 
-/* Button press feedback */
+/* Button press */
 button:active { transform: translateY(1px); }
+
+/* Stat strip (KPI) */
+.kpi-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; }

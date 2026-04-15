@@ -2,49 +2,38 @@
 {% macro rub(v) %}{{ "{:,.0f}".format(v or 0).replace(",", " ") }} ₽{% endmacro %}
 {% block content %}
 
-<section class="mb-4 flex items-end justify-between gap-4 flex-wrap">
-  <div>
-    <h2 class="text-xl font-semibold text-slate-900">Договоры</h2>
-    <div class="text-xs text-slate-500">полный реестр работ по действующим договорам (только чтение)</div>
-  </div>
-  <div class="text-xs text-slate-500">
-    договоров: <span class="font-semibold text-slate-800">{{ groups|length }}</span>
-  </div>
-</section>
-
-<section class="mb-5 grid grid-cols-3 gap-3">
+{# ── KPI-карточки ───────────────────────────────────────────────────── #}
+<section class="mb-4 grid grid-cols-3 gap-3">
   <div class="card px-4 py-3">
-    <div class="text-[11px] uppercase tracking-wide text-slate-500">Заказано</div>
+    <div class="kpi-label">Заказано</div>
     <div class="text-xl font-semibold tabular-nums mt-0.5">{{ rub(total_ordered) }}</div>
+    <div class="text-xs text-slate-400 mt-1">{{ groups|length }} договоров</div>
   </div>
   <div class="card px-4 py-3">
-    <div class="text-[11px] uppercase tracking-wide text-slate-500">Выполнено</div>
+    <div class="kpi-label">Выполнено</div>
     <div class="text-xl font-semibold text-emerald-700 tabular-nums mt-0.5">{{ rub(total_done) }}</div>
-    <div class="text-[11px] text-slate-500 mt-1">{% if total_ordered %}{{ "%.0f"|format(total_done/total_ordered*100) }}% от заказанного{% endif %}</div>
+    <div class="text-xs text-slate-400 mt-1">{% if total_ordered %}{{ "%.0f"|format(total_done/total_ordered*100) }}% от заказанного{% endif %}</div>
   </div>
   <div class="card px-4 py-3">
-    <div class="text-[11px] uppercase tracking-wide text-slate-500">Остаток</div>
+    <div class="kpi-label">Остаток</div>
     <div class="text-xl font-semibold text-amber-700 tabular-nums mt-0.5">{{ rub(total_remaining) }}</div>
   </div>
 </section>
 
-<form method="get" action="/contracts" class="mb-4 flex gap-3 items-end card p-3">
-  <div class="flex-1">
-    <label class="block text-xs text-slate-500 mb-1">Поиск (№ заказа, № договора, контрагент, проект)</label>
-    <input name="q" value="{{ q }}" class="w-full border rounded px-3 py-2 text-sm">
-  </div>
-  <div>
-    <label class="block text-xs text-slate-500 mb-1">Договор</label>
-    <select name="contract_id" class="border rounded px-2 py-2 text-sm w-64">
-      <option value="">— все —</option>
-      {% for c in contracts %}
-        <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>{{ c.number }} — {{ c.counterparty or "—" }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-2 font-medium shadow-sm">Применить</button>
-  <a href="/contracts" class="text-sm text-slate-500 hover:underline">Сброс</a>
-  <a href="/export/contracts.xlsx?contract_id={{ contract_id or '' }}&q={{ q or '' }}" class="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md px-3 py-2 font-medium shadow-sm">Экспорт в Excel</a>
+{# ── Фильтр ─────────────────────────────────────────────────────────── #}
+<form method="get" action="/contracts" class="mb-4 flex gap-2 items-center card p-2">
+  <input name="q" value="{{ q }}" placeholder="Поиск по № заказа, договору, контрагенту, проекту…"
+         class="flex-1 border rounded px-3 py-1.5 text-sm min-w-0">
+  <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-64 shrink-0">
+    <option value="">— все договоры —</option>
+    {% for c in contracts %}
+      <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>{{ c.number }} — {{ c.counterparty or "—" }}</option>
+    {% endfor %}
+  </select>
+  <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-1.5 font-medium shrink-0">Применить</button>
+  <a href="/contracts" class="text-sm text-slate-400 hover:text-slate-600 shrink-0">Сброс</a>
+  <a href="/export/contracts.xlsx?contract_id={{ contract_id or '' }}&q={{ q or '' }}"
+     class="ml-auto text-emerald-700 hover:text-emerald-900 text-sm font-medium border border-emerald-300 hover:border-emerald-500 rounded px-3 py-1.5 shrink-0">↓ Excel</a>
 </form>
 
 {% if not groups %}
@@ -54,6 +43,7 @@
 {% for g in groups %}
   {% set c = g.contract %}
   {% set dp = (g.done_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
+  {% set sp = (g.signed_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
   <details class="mb-3 card">
     <summary class="cursor-pointer px-4 py-3 flex items-start gap-4 hover:bg-slate-50">
       <div class="flex-1 min-w-0">
@@ -61,28 +51,27 @@
           <span class="font-semibold text-slate-900">{{ c.counterparty or "—" }}</span>
           {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono">{{ c.contract_no }}{% if c.contract_date %} · {{ c.contract_date.strftime('%d.%m.%Y') }}{% endif %}</span>{% endif %}
         </div>
-        <div class="text-xs text-slate-600 truncate">{{ c.project or "" }}</div>
+        <div class="text-xs text-slate-500 truncate">{{ c.project or "" }}</div>
       </div>
-      {% set sp = (g.signed_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
-      <div class="hidden md:flex flex-col gap-1 w-72 shrink-0">
+      <div class="hidden md:flex flex-col gap-1 w-64 shrink-0">
         <div class="flex justify-between text-[11px] text-slate-500">
-          <span>заказано <span class="text-slate-800 font-medium tabular-nums">{{ rub(g.ordered_rub) }}</span></span>
-          <span>выполн. <span class="text-emerald-700 font-medium tabular-nums">{{ "%.0f"|format(dp) }}%</span></span>
+          <span class="tabular-nums">{{ rub(g.ordered_rub) }}</span>
+          <span class="text-emerald-700 tabular-nums">{{ "%.0f"|format(dp) }}% выполн.</span>
         </div>
-        <div class="relative w-full h-1.5 bg-slate-200 rounded-full overflow-hidden" title="выполнено {{ '%.0f'|format(dp) }}% · подписано {{ '%.0f'|format(sp) }}%">
-          <div class="absolute inset-y-0 left-0 bg-emerald-300" style="width: {{ dp if dp <= 100 else 100 }}%"></div>
+        <div class="relative w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+          <div class="absolute inset-y-0 left-0 bg-emerald-200" style="width: {{ dp if dp <= 100 else 100 }}%"></div>
           <div class="absolute inset-y-0 left-0 bg-emerald-600" style="width: {{ sp if sp <= 100 else 100 }}%"></div>
         </div>
         <div class="flex justify-between text-[10px] text-slate-400">
-          <span>план <span class="text-indigo-700 font-medium tabular-nums">{{ rub(g.plan_rub) }}</span></span>
+          <span>план <span class="text-slate-600 font-medium tabular-nums">{{ rub(g.plan_rub) }}</span></span>
           <span>подпис. <span class="text-emerald-700 font-medium tabular-nums">{{ rub(g.signed_rub) }}</span></span>
         </div>
       </div>
-      <span class="text-xs text-slate-500 whitespace-nowrap">работ: {{ g.rows|length }}{% if g.closed_n %} · закрытых: {{ g.closed_n }}{% endif %}</span>
+      <span class="text-xs text-slate-400 whitespace-nowrap">{{ g.rows|length }} работ{% if g.closed_n %} · {{ g.closed_n }} закрытых{% endif %}</span>
     </summary>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
-        <thead class="bg-slate-50 text-xs text-slate-600 border-t">
+        <thead class="bg-slate-50 text-xs text-slate-500 border-t">
           <tr>
             <th class="text-left px-3 py-2 w-[38%]">Описание работы</th>
             <th class="text-left px-2 py-2">Номенклатура</th>
@@ -98,9 +87,9 @@
             {% set ol = r.ol %}
             {% set b = r.balance %}
             {% set closed = b.qty_remaining is not none and b.qty_remaining <= 0 %}
-            <tr class="border-t hover:bg-slate-50 {% if closed %}bg-slate-50/60 text-slate-500{% endif %}">
+            <tr class="border-t hover:bg-slate-50 {% if closed %}text-slate-400{% endif %}">
               <td class="px-3 py-2 align-top">{{ ol.description }}</td>
-              <td class="px-2 py-2 align-top text-xs text-slate-600">{{ ol.work_type.name if ol.work_type else "—" }}</td>
+              <td class="px-2 py-2 align-top text-xs text-slate-500">{{ ol.work_type.name if ol.work_type else "—" }}</td>
               <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ "%.2f"|format(ol.qty_ordered or 0) }}</td>
               <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(ol.sum_ordered) }}</td>
               <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">
@@ -111,11 +100,11 @@
                 {{ "%.2f"|format(b.qty_remaining or 0) }}
                 <div class="text-[11px] {% if not closed %}text-amber-600{% else %}text-slate-400{% endif %}">{{ rub(b.sum_remaining) }}</div>
               </td>
-              <td class="px-2 py-2 text-center text-xs whitespace-nowrap">
+              <td class="px-2 py-2 text-center whitespace-nowrap">
                 {% if closed %}
-                  <span class="inline-block bg-slate-200 text-slate-600 rounded px-2 py-0.5">закрыта</span>
+                  <span class="text-xs text-slate-400">закрыта</span>
                 {% else %}
-                  <span class="inline-block bg-amber-100 text-amber-800 rounded px-2 py-0.5">в работе</span>
+                  <span class="text-xs text-amber-700">в работе</span>
                 {% endif %}
               </td>
             </tr>

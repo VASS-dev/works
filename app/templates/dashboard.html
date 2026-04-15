@@ -2,12 +2,10 @@
 {% macro rub(v) %}{{ "{:,.0f}".format(v or 0).replace(",", " ") }} ₽{% endmacro %}
 {% macro pct(a, b) %}{% if b %}{{ "%.0f"|format(a / b * 100) }}%{% else %}—{% endif %}{% endmacro %}
 {% macro bar(fact, signed, plan) %}
-  {% set fp = (fact / plan * 100) if plan else 0 %}
-  {% set sp = (signed / plan * 100) if plan else 0 %}
-  {% if fp > 100 %}{% set fp = 100 %}{% endif %}
-  {% if sp > 100 %}{% set sp = 100 %}{% endif %}
-  <div class="relative w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-    <div class="absolute inset-y-0 left-0 bg-emerald-300" style="width: {{ fp }}%"></div>
+  {% set fp = [(fact / plan * 100) if plan else 0, 100]|min %}
+  {% set sp = [(signed / plan * 100) if plan else 0, 100]|min %}
+  <div class="relative w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+    <div class="absolute inset-y-0 left-0 bg-emerald-200" style="width: {{ fp }}%"></div>
     <div class="absolute inset-y-0 left-0 bg-emerald-600" style="width: {{ sp }}%"></div>
   </div>
 {% endmacro %}
@@ -16,79 +14,82 @@
 {% set plan_total = totals.plan_draft_sum + totals.plan_approved_sum %}
 {% set done_pct = (total_done / total_ordered * 100) if total_ordered else 0 %}
 
-<section class="mb-4 flex items-end justify-between gap-4 flex-wrap">
+{# ── Заголовок + фильтр ──────────────────────────────────────────────── #}
+<section class="mb-4 flex items-center justify-between gap-4 flex-wrap">
   <div>
-    <h2 class="text-xl font-semibold text-slate-900">
+    <h2 class="text-lg font-semibold text-slate-900">
       {% if all_periods %}Сводка за всё время{% else %}Сводка по периодам{% endif %}
     </h2>
     {% if periods %}
-      <div class="text-xs text-slate-500">{{ periods[0].label }} — {{ periods[-1].label }} · {{ periods|length }} мес</div>
+      <div class="text-xs text-slate-400">{{ periods[0].label }} — {{ periods[-1].label }} · {{ periods|length }} мес</div>
     {% endif %}
   </div>
   <form method="get" action="/dashboard" class="card p-2 flex gap-2 items-center">
     <div class="flex items-center gap-1">
-      <a href="?start={{ prev_start }}&n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100">←</a>
-      <input name="start" value="{% if not all_periods %}{{ start }}{% endif %}" placeholder="{{ today_period }}" class="border rounded px-2 py-1.5 text-sm w-24">
-      <a href="?n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100">•</a>
-      <a href="?start={{ next_start }}&n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100">→</a>
+      <a href="?start={{ prev_start }}&n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none">←</a>
+      <input name="start" value="{% if not all_periods %}{{ start }}{% endif %}" placeholder="{{ today_period }}"
+             class="border rounded px-2 py-1.5 text-sm w-24 text-center">
+      <a href="?n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none">•</a>
+      <a href="?start={{ next_start }}&n={{ n }}" class="border rounded px-2 py-1.5 text-sm hover:bg-slate-100 leading-none">→</a>
     </div>
     <select name="n" class="border rounded px-2 py-1.5 text-sm">
       {% for opt in [3, 6, 9, 12, 18, 24] %}
         <option value="{{ opt }}" {% if n == opt and not all_periods %}selected{% endif %}>{{ opt }} мес</option>
       {% endfor %}
     </select>
-    <label class="flex items-center gap-1.5 text-sm text-slate-700 select-none px-2">
+    <label class="flex items-center gap-1.5 text-sm text-slate-600 select-none px-1">
       <input type="checkbox" name="all" value="1" {% if all_periods %}checked{% endif %}>
       всё
     </label>
     <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-3 py-1.5 font-medium">OK</button>
-    <a href="/export/dashboard.xlsx?start={{ start or '' }}&n={{ n }}{% if all_periods %}&all=1{% endif %}" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md px-3 py-1.5 font-medium">Excel</a>
+    <a href="/export/dashboard.xlsx?start={{ start or '' }}&n={{ n }}{% if all_periods %}&all=1{% endif %}"
+       class="text-emerald-700 hover:text-emerald-900 text-sm font-medium border border-emerald-300 hover:border-emerald-500 rounded px-3 py-1.5">↓ Excel</a>
   </form>
 </section>
 
-<section class="mb-3 grid grid-cols-3 gap-3">
+{# ── KPI-карточки ────────────────────────────────────────────────────── #}
+<section class="mb-4 grid grid-cols-3 gap-3">
   <div class="card px-4 py-3">
-    <div class="text-[11px] uppercase tracking-wide text-slate-500">Σ План</div>
+    <div class="kpi-label">Σ План</div>
     <div class="text-xl font-semibold tabular-nums mt-0.5">{{ rub(plan_total) }}</div>
-    <div class="text-[11px] text-slate-500 mt-1">утв. <span class="text-emerald-700 font-medium tabular-nums">{{ rub(totals.plan_approved_sum) }}</span> · черн. <span class="tabular-nums">{{ rub(totals.plan_draft_sum) }}</span></div>
+    <div class="text-xs text-slate-400 mt-1">утв. <span class="text-emerald-700 tabular-nums">{{ rub(totals.plan_approved_sum) }}</span> · черн. <span class="tabular-nums">{{ rub(totals.plan_draft_sum) }}</span></div>
   </div>
   <div class="card px-4 py-3">
-    <div class="text-[11px] uppercase tracking-wide text-slate-500">Σ Факт</div>
+    <div class="kpi-label">Σ Факт</div>
     <div class="text-xl font-semibold tabular-nums text-emerald-700 mt-0.5">{{ rub(totals.fact_sum) }}</div>
-    <div class="text-[11px] text-slate-500 mt-1">{{ pct(totals.fact_sum, plan_total) }} от плана</div>
+    <div class="text-xs text-slate-400 mt-1">{{ pct(totals.fact_sum, plan_total) }} от плана</div>
   </div>
   <div class="card px-4 py-3">
-    <div class="text-[11px] uppercase tracking-wide text-slate-500">Σ Подписано</div>
+    <div class="kpi-label">Σ Подписано</div>
     <div class="text-xl font-semibold tabular-nums text-emerald-800 mt-0.5">{{ rub(totals.signed_sum) }}</div>
-    <div class="text-[11px] text-slate-500 mt-1">{{ pct(totals.signed_sum, plan_total) }} от плана · {{ pct(totals.signed_sum, totals.fact_sum) }} от факта</div>
+    <div class="text-xs text-slate-400 mt-1">{{ pct(totals.signed_sum, plan_total) }} от плана · {{ pct(totals.signed_sum, totals.fact_sum) }} от факта</div>
   </div>
 </section>
 
-<section class="mb-6 card px-4 py-3">
-  <div class="flex items-center justify-between gap-4 flex-wrap">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-lg">⏳</div>
-      <div>
-        <div class="text-[11px] uppercase tracking-wide text-slate-500">Остаток по всем договорам</div>
-        <div class="text-2xl font-semibold text-amber-700 tabular-nums leading-tight">{{ rub(total_contract_remaining) }}</div>
-      </div>
+{# ── Остаток по договорам ─────────────────────────────────────────────── #}
+<section class="mb-4 card px-4 py-3">
+  <div class="flex items-center justify-between gap-6 flex-wrap">
+    <div>
+      <div class="kpi-label">Остаток по всем договорам</div>
+      <div class="text-2xl font-semibold text-amber-700 tabular-nums leading-tight mt-0.5">{{ rub(total_contract_remaining) }}</div>
     </div>
     <div class="flex gap-6 text-xs">
-      <div><div class="text-slate-500">Договоров</div><div class="font-semibold text-slate-800 tabular-nums">{{ contracts_count }}</div></div>
-      <div><div class="text-slate-500">Заказано</div><div class="font-semibold text-slate-800 tabular-nums">{{ rub(total_ordered) }}</div></div>
-      <div><div class="text-slate-500">Выполнено</div><div class="font-semibold text-emerald-700 tabular-nums">{{ rub(total_done) }}</div></div>
-      <div><div class="text-slate-500">% закрытия</div><div class="font-semibold text-slate-800 tabular-nums">{{ "%.0f"|format(done_pct) }}%</div></div>
+      <div><div class="text-slate-400">Договоров</div><div class="font-semibold text-slate-800 tabular-nums mt-0.5">{{ contracts_count }}</div></div>
+      <div><div class="text-slate-400">Заказано</div><div class="font-semibold text-slate-800 tabular-nums mt-0.5">{{ rub(total_ordered) }}</div></div>
+      <div><div class="text-slate-400">Выполнено</div><div class="font-semibold text-emerald-700 tabular-nums mt-0.5">{{ rub(total_done) }}</div></div>
+      <div><div class="text-slate-400">% закрытия</div><div class="font-semibold text-slate-800 tabular-nums mt-0.5">{{ "%.0f"|format(done_pct) }}%</div></div>
     </div>
   </div>
-  <div class="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+  <div class="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
     <div class="h-full bg-emerald-500" style="width: {{ done_pct if done_pct <= 100 else 100 }}%"></div>
   </div>
 </section>
 
-<section class="mb-6 card overflow-hidden">
-  <div class="px-4 py-2 border-b bg-slate-50 font-semibold text-sm">По периодам</div>
+{# ── Таблица по периодам ──────────────────────────────────────────────── #}
+<section class="mb-4 card overflow-hidden">
+  <div class="px-4 py-2 border-b bg-slate-50 font-medium text-sm text-slate-700">По периодам</div>
   <table class="w-full text-sm">
-    <thead class="bg-slate-50 text-xs text-slate-600 border-b">
+    <thead class="bg-slate-50 text-xs text-slate-500 border-b">
       <tr>
         <th class="text-left px-3 py-2">Период</th>
         <th class="text-right px-2 py-2">План, ₽</th>
@@ -113,43 +114,41 @@
           </td>
           <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(p.fact_sum) }}</td>
           <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-emerald-800 font-medium">{{ rub(p.signed_sum) }}
-            {% if p.signed_n %}<span class="text-[11px] text-slate-400">({{ p.signed_n }})</span>{% endif %}
+            {% if p.signed_n %}<span class="text-[11px] text-slate-400 font-normal">({{ p.signed_n }})</span>{% endif %}
           </td>
-          <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ pct(p.fact_sum, pl) }}</td>
+          <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-slate-600">{{ pct(p.fact_sum, pl) }}</td>
           <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap font-medium">{{ pct(p.signed_sum, pl) }}</td>
         </tr>
       {% endfor %}
     </tbody>
     <tfoot class="bg-slate-50 text-sm font-medium">
       <tr class="border-t-2 border-slate-200">
-        <td class="px-3 py-2.5">Итого</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ rub(plan_total) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap text-emerald-700">{{ rub(totals.plan_approved_sum) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ rub(totals.fact_sum) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap text-emerald-800">{{ rub(totals.signed_sum) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ pct(totals.fact_sum, plan_total) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ pct(totals.signed_sum, plan_total) }}</td>
+        <td class="px-3 py-2">Итого</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(plan_total) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-emerald-700">{{ rub(totals.plan_approved_sum) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(totals.fact_sum) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-emerald-800">{{ rub(totals.signed_sum) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-slate-600">{{ pct(totals.fact_sum, plan_total) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ pct(totals.signed_sum, plan_total) }}</td>
       </tr>
     </tfoot>
   </table>
 </section>
 
-<section class="mb-6 card overflow-hidden">
-  <div class="px-4 py-2 border-b bg-slate-50 font-semibold text-sm flex items-center justify-between">
-    <span>По договорам</span>
-    <span class="text-xs font-normal text-slate-500">тёмно-зелёный — подписано, светлый — факт</span>
-  </div>
+{# ── Таблица по договорам ─────────────────────────────────────────────── #}
+<section class="mb-4 card overflow-hidden">
+  <div class="px-4 py-2 border-b bg-slate-50 font-medium text-sm text-slate-700">По договорам</div>
   <table class="w-full text-sm">
-    <thead class="bg-slate-50 text-xs text-slate-600 border-b">
+    <thead class="bg-slate-50 text-xs text-slate-500 border-b">
       <tr>
         <th class="text-left px-3 py-2 w-[30%]">Контрагент / проект</th>
-        <th class="text-left px-2 py-2">№</th>
+        <th class="text-left px-2 py-2">Договор №</th>
         <th class="text-right px-2 py-2">План, ₽</th>
         <th class="text-right px-2 py-2">Факт, ₽</th>
         <th class="text-right px-2 py-2">Подписано, ₽</th>
         <th class="text-right px-2 py-2">Осталось, ₽</th>
-        <th class="text-left px-3 py-2 w-[18%]">Прогресс</th>
-        <th class="text-right px-2 py-2">% подпис.</th>
+        <th class="text-left px-3 py-2 w-[14%]">Прогресс</th>
+        <th class="text-right px-2 py-2">%</th>
       </tr>
     </thead>
     <tbody>
@@ -160,7 +159,7 @@
         <tr class="border-t hover:bg-slate-50">
           <td class="px-3 py-2">
             <div class="text-slate-800 font-medium">{{ c.counterparty or "—" }}</div>
-            <div class="text-xs text-slate-500 truncate">{{ c.project or "" }}</div>
+            <div class="text-xs text-slate-400 truncate">{{ c.project or "" }}</div>
           </td>
           <td class="px-2 py-2 text-xs text-slate-400 font-mono whitespace-nowrap">{{ c.number }}</td>
           <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(k.plan_sum) }}</td>
@@ -177,13 +176,13 @@
     </tbody>
     <tfoot class="bg-slate-50 text-sm font-medium">
       <tr class="border-t-2 border-slate-200">
-        <td class="px-3 py-2.5" colspan="2">Итого</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ rub(plan_total) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ rub(totals.fact_sum) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap text-emerald-800">{{ rub(totals.signed_sum) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap text-amber-700">{{ rub(plan_total - totals.signed_sum) }}</td>
-        <td class="px-3 py-2.5">{{ bar(totals.fact_sum, totals.signed_sum, plan_total) }}</td>
-        <td class="px-2 py-2.5 text-right tabular-nums whitespace-nowrap">{{ pct(totals.signed_sum, plan_total) }}</td>
+        <td class="px-3 py-2" colspan="2">Итого</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(plan_total) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(totals.fact_sum) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-emerald-800">{{ rub(totals.signed_sum) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap text-amber-700">{{ rub(plan_total - totals.signed_sum) }}</td>
+        <td class="px-3 py-2">{{ bar(totals.fact_sum, totals.signed_sum, plan_total) }}</td>
+        <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ pct(totals.signed_sum, plan_total) }}</td>
       </tr>
     </tfoot>
   </table>

@@ -2,95 +2,84 @@
 {% macro rub(v) %}{{ "{:,.0f}".format(v or 0).replace(",", " ") }} ₽{% endmacro %}
 {% block content %}
 
-<section class="mb-4 flex items-center justify-between">
-  <div>
-    <div class="text-xs text-slate-500">Период исполнения</div>
-    <div class="text-xl font-semibold">{{ period_label }}</div>
-  </div>
-  <div class="text-sm text-slate-500">
-    плановых актов: <span class="font-semibold text-slate-800">{{ total_rows }}</span>
-  </div>
-</section>
-
+{# ── KPI-карточки ───────────────────────────────────────────────────── #}
 {% set tpct = (totals.fact_sum / totals.plan_sum * 100) if totals.plan_sum else 0 %}
-<section class="mb-5 grid grid-cols-4 gap-4">
-  <div class="card p-4">
-    <div class="text-xs text-slate-500">Σ План, ₽</div>
-    <div class="text-xl font-semibold">{{ rub(totals.plan_sum) }}</div>
-    <div class="text-xs text-slate-400">кол-во: {{ "%.2f"|format(totals.plan_qty) }}</div>
+<section class="mb-4 grid grid-cols-4 gap-3">
+  <div class="card px-4 py-3">
+    <div class="kpi-label">Период</div>
+    <div class="text-xl font-semibold mt-0.5">{{ period_label }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">{{ total_rows }} плановых актов</div>
   </div>
-  <div class="card p-4">
-    <div class="text-xs text-slate-500">Σ Факт, ₽</div>
-    <div class="text-xl font-semibold text-emerald-700">{{ rub(totals.fact_sum) }}</div>
-    <div class="text-xs text-slate-400">кол-во: {{ "%.2f"|format(totals.fact_qty) }}</div>
+  <div class="card px-4 py-3">
+    <div class="kpi-label">Σ План, ₽</div>
+    <div class="text-xl font-semibold tabular-nums mt-0.5">{{ rub(totals.plan_sum) }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">кол-во: {{ "%.2f"|format(totals.plan_qty) }}</div>
   </div>
-  <div class="card p-4">
-    <div class="text-xs text-slate-500">% выполнения (₽)</div>
-    <div class="text-xl font-semibold {% if tpct > 100 %}text-red-600{% elif tpct >= 100 %}text-emerald-700{% elif tpct > 0 %}text-slate-800{% else %}text-slate-400{% endif %}">
+  <div class="card px-4 py-3">
+    <div class="kpi-label">Σ Факт, ₽</div>
+    <div class="text-xl font-semibold text-emerald-700 tabular-nums mt-0.5">{{ rub(totals.fact_sum) }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">кол-во: {{ "%.2f"|format(totals.fact_qty) }}</div>
+  </div>
+  <div class="card px-4 py-3">
+    <div class="kpi-label">Выполнение</div>
+    <div class="text-xl font-semibold tabular-nums mt-0.5 {% if tpct > 100 %}text-red-600{% elif tpct >= 100 %}text-emerald-700{% elif tpct > 0 %}text-slate-800{% else %}text-slate-400{% endif %}">
       {{ "%.0f"|format(tpct) }}%
     </div>
-  </div>
-  <div class="card p-4">
-    <div class="text-xs text-slate-500">Осталось до плана, ₽</div>
-    <div class="text-xl font-semibold text-amber-700">{{ rub((totals.plan_sum - totals.fact_sum)) }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">осталось: {{ rub(totals.plan_sum - totals.fact_sum) }}</div>
   </div>
 </section>
 
-<form method="get" action="/execution" class="mb-4 flex gap-3 items-end card p-3">
-  <div>
-    <label class="block text-xs text-slate-500 mb-1">Период (YYYY-MM)</label>
-    <input name="period" value="{{ period }}" class="border rounded px-2 py-2 text-sm w-28">
-  </div>
-  <div>
-    <label class="block text-xs text-slate-500 mb-1">Договор</label>
-    <select name="contract_id" class="border rounded px-2 py-2 text-sm w-64">
-      <option value="">— все —</option>
-      {% for c in contracts %}
-        <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>
-          {{ c.number }} — {{ c.counterparty or "—" }}
-        </option>
-      {% endfor %}
-    </select>
-  </div>
-  <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-2 font-medium shadow-sm">Показать</button>
-  <a href="/execution" class="text-sm text-slate-500 hover:underline">Сброс</a>
-  <a href="/export/execution.xlsx?period={{ period }}&contract_id={{ contract_id or '' }}" class="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md px-3 py-2 font-medium shadow-sm">Экспорт в Excel</a>
+{# ── Фильтр ─────────────────────────────────────────────────────────── #}
+<form method="get" action="/execution" class="mb-4 flex gap-2 items-center card p-2">
+  <input name="period" value="{{ period }}" placeholder="YYYY-MM"
+         class="border rounded px-2 py-1.5 text-sm w-28">
+  <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-64">
+    <option value="">— все договоры —</option>
+    {% for c in contracts %}
+      <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>
+        {{ c.number }} — {{ c.counterparty or "—" }}
+      </option>
+    {% endfor %}
+  </select>
+  <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-1.5 font-medium">Показать</button>
+  <a href="/execution" class="text-sm text-slate-400 hover:text-slate-600">Сброс</a>
+  <a href="/export/execution.xlsx?period={{ period }}&contract_id={{ contract_id or '' }}"
+     class="ml-auto text-emerald-700 hover:text-emerald-900 text-sm font-medium border border-emerald-300 hover:border-emerald-500 rounded px-3 py-1.5">↓ Excel</a>
 </form>
 
 {% if not groups %}
   <div class="text-slate-500 text-sm py-10 text-center">
     На период {{ period_label }} нет утверждённых планов.
-    <div class="mt-2 text-xs">Утверждайте план на главной странице, плановые акты появятся здесь автоматически.</div>
+    <div class="mt-2 text-xs text-slate-400">Утверждайте план на главной странице — плановые акты появятся здесь автоматически.</div>
   </div>
 {% endif %}
 
 {% for group in groups %}
   {% set c = group.contract %}
   {% set gpct = (group.fact_sum / group.plan_sum * 100) if group.plan_sum else 0 %}
-  <details open class="mb-4 card">
+  <details open class="mb-3 card">
     <summary class="cursor-pointer px-4 py-3 flex items-center gap-4 hover:bg-slate-50">
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-slate-900">{{ c.counterparty or "—" }}</div>
-        <div class="text-xs text-slate-600 truncate">{{ c.project or "" }}</div>
+        <div class="text-xs text-slate-500 truncate">{{ c.project or "" }}</div>
       </div>
-      <div class="text-right">
-        <div class="text-xs text-slate-500">план: <span class="text-slate-800 font-medium">{{ rub(group.plan_sum) }}</span></div>
-        <div class="text-xs text-slate-500">факт: <span class="text-emerald-700 font-medium">{{ rub(group.fact_sum) }}</span>
+      <div class="text-right shrink-0">
+        <div class="text-xs text-slate-500">план: <span class="text-slate-800 font-medium tabular-nums">{{ rub(group.plan_sum) }}</span></div>
+        <div class="text-xs text-slate-500">факт: <span class="text-emerald-700 font-medium tabular-nums">{{ rub(group.fact_sum) }}</span>
           <span class="ml-1 {% if gpct > 100 %}text-red-600 font-semibold{% elif gpct >= 100 %}text-emerald-700{% endif %}">({{ "%.0f"|format(gpct) }}%)</span>
         </div>
       </div>
-      <span class="text-xs text-slate-400 font-mono">{{ c.number }}</span>
-      <span class="text-xs text-slate-500 whitespace-nowrap">строк: {{ group.rows|length }}</span>
+      <span class="text-xs text-slate-400 font-mono shrink-0">{{ c.number }}</span>
       <button type="button"
               hx-post="/api/execution/sign_bulk" hx-swap="none"
               hx-vals='{"period":"{{ period }}","contract_id":"{{ c.id }}"}'
               hx-confirm="Подписать все черновики планового акта по этому договору за {{ period_label }}?"
               hx-on::after-request="window.location.reload()"
               onclick="event.stopPropagation()"
-              class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1.5 font-medium">🔒 Подписать все</button>
+              class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1.5 font-medium shrink-0">Подписать все</button>
     </summary>
     <table class="w-full text-sm">
-      <thead class="bg-slate-100 text-xs text-slate-600">
+      <thead class="bg-slate-50 text-xs text-slate-500 border-t">
         <tr>
           <th class="text-left px-3 py-2 w-[34%]">Описание работы</th>
           <th class="text-right px-2 py-2">План, кол-во</th>
@@ -109,9 +98,9 @@
           {% include "partials/execution_row.html" %}
         {% endfor %}
       </tbody>
-      <tfoot class="bg-slate-50 text-xs">
-        <tr class="border-t">
-          <td class="px-3 py-2 text-slate-600 font-medium">Итого по договору</td>
+      <tfoot class="bg-slate-50 text-xs border-t">
+        <tr>
+          <td class="px-3 py-2 text-slate-600 font-medium">Итого</td>
           <td class="px-2 py-2 text-right tabular-nums text-slate-700">{{ "%.2f"|format(group.plan_qty) }}</td>
           <td class="px-2 py-2 text-right tabular-nums text-slate-800 font-medium">{{ rub(group.plan_sum) }}</td>
           <td class="px-2 py-2 text-right tabular-nums text-slate-700">{{ "%.2f"|format(group.fact_qty) }}</td>
