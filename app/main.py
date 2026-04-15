@@ -186,8 +186,7 @@ def forms_page(request: Request):
         today_period = date.today().strftime("%Y-%m")
     finally:
         s.close()
-    return TEMPLATES.TemplateResponse("forms.html", {
-        "request": request,
+    return TEMPLATES.TemplateResponse(request, "forms.html", {
         "contracts": contracts,
         "today_period": today_period,
     })
