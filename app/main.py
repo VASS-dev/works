@@ -25,6 +25,7 @@ from app.services import export as export_svc
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
 
+config.validate()
 engine = init_db()
 SessionLocal = make_session_factory(engine)
 
@@ -58,11 +59,49 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         )
 
 
+class OriginCheckMiddleware(BaseHTTPMiddleware):
+    """CSRF-защита по Origin/Referer для state-changing запросов.
+
+    Браузер шлёт Origin при всех cross-origin POST/PUT/DELETE. Если он не
+    совпадает с нашим Host или списком ALLOWED_ORIGINS — отклоняем. Для
+    same-origin submit Origin == scheme+Host (или отсутствует в некоторых
+    старых случаях — тогда проверяем Referer).
+    """
+
+    UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method not in self.UNSAFE_METHODS:
+            return await call_next(request)
+        origin = request.headers.get("origin") or ""
+        referer = request.headers.get("referer") or ""
+        host = request.headers.get("host") or ""
+        allowed = set(config.ALLOWED_ORIGINS)
+        if host:
+            allowed.add(f"http://{host}")
+            allowed.add(f"https://{host}")
+        source = origin or referer
+        if source:
+            if not any(source.startswith(a) for a in allowed):
+                return Response(status_code=403, content="Origin not allowed")
+        return await call_next(request)
+
+
+app.add_middleware(OriginCheckMiddleware)
 app.add_middleware(BasicAuthMiddleware)
 
 
 @app.get("/healthz")
 def healthz():
+    from sqlalchemy import text
+    try:
+        s = SessionLocal()
+        try:
+            s.execute(text("SELECT 1"))
+        finally:
+            s.close()
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)[:200]}, status_code=500)
     return JSONResponse({"ok": True})
 
 
