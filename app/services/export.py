@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import ActLine, Contract, ExecutionEntry, OrderLine, PlanEntry, WorkType
 from app.services.balances import balance
+from app.services.pricing import unit_price
 
 
 HEADER_FILL = PatternFill("solid", fgColor="E2E8F0")
@@ -75,7 +76,7 @@ def export_contracts(session: Session, contract_id: Optional[int] = None, q: Opt
     for c in contracts:
         for ol in c.order_lines:
             b = balance(session, ol.id)
-            unit = (ol.sum_ordered / ol.qty_ordered) if (ol.sum_ordered and ol.qty_ordered) else 0.0
+            unit = unit_price(ol)
             pe_list = session.query(PlanEntry).filter(PlanEntry.order_line_id == ol.id).all()
             plan_rub = sum(float(pe.plan_qty or 0.0) * unit for pe in pe_list)
             pe_ids = [pe.id for pe in pe_list]
@@ -193,7 +194,7 @@ def export_execution(session: Session, period: str, contract_id: Optional[int] =
         pe = ex.plan_entry
         ol = pe.order_line
         c = ol.contract
-        unit = (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
+        unit = unit_price(ol)
         plan_qty = pe.plan_qty or 0.0
         plan_sum = (pe.plan_sum or 0.0) or plan_qty * unit
         fact_qty = ex.qty_fact or 0.0
@@ -229,7 +230,7 @@ def export_dashboard(session: Session, periods_filter: Optional[list[str]]) -> b
     by_period: dict[str, dict] = {}
     by_contract: dict[int, dict] = {}
     for pe, ol, c, ex in rows:
-        unit = (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
+        unit = unit_price(ol)
         plan_qty = pe.plan_qty or 0.0
         plan_sum = (pe.plan_sum or 0.0) or plan_qty * unit
         fact_sum = (ex.sum_fact or 0.0) if ex else 0.0

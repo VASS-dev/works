@@ -18,7 +18,8 @@ from app import config
 from app.db import init_db, make_session_factory
 from app.models import ActLine, Contract, ExecutionEntry, OrderLine, PlanEntry, WorkType
 from sqlalchemy.orm import joinedload
-from app.services.balances import balance
+from app.services.balances import balance, balance_bulk
+from app.services.pricing import unit_price
 from app.services import export as export_svc
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -213,7 +214,7 @@ def load_rows(session: Session, periods: list[str], contract_id: Optional[int], 
         })
         g["ordered_rub"] += float(ol.sum_ordered or 0.0)
         g["done_rub"] += float(b.sum_done or 0.0)
-        unit = (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
+        unit = unit_price(ol)
         plans = [plans_by_key.get((ol.id, p)) for p in periods]
         plan_values = [(pe.plan_qty if pe else None) for pe in plans]
         plan_statuses = [(pe.status if pe else "draft") for pe in plans]
@@ -401,9 +402,7 @@ def dashboard(
     all: int = 0,
     session: Session = Depends(get_session),
 ):
-    def _unit(ol: OrderLine) -> float:
-        return (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
-
+    _unit = unit_price
     periods_filter: Optional[list[str]] = None
     if not all:
         periods_filter = next_periods(start, n)
@@ -547,6 +546,25 @@ def contracts_page(
         selectinload(Contract.order_lines).selectinload(OrderLine.work_type)
     ).all()
 
+    all_ol_ids = [ol.id for c in contracts_full for ol in c.order_lines]
+    balances_map = balance_bulk(session, all_ol_ids)
+
+    plan_qty_rows = session.query(
+        PlanEntry.order_line_id,
+        func.coalesce(func.sum(PlanEntry.plan_qty), 0.0),
+    ).filter(PlanEntry.order_line_id.in_(all_ol_ids)).group_by(PlanEntry.order_line_id).all() if all_ol_ids else []
+    plan_qty_map = {r[0]: float(r[1]) for r in plan_qty_rows}
+
+    signed_rows = session.query(
+        PlanEntry.order_line_id,
+        func.coalesce(func.sum(ExecutionEntry.qty_fact), 0.0),
+    ).join(ExecutionEntry, ExecutionEntry.plan_entry_id == PlanEntry.id).filter(
+        PlanEntry.order_line_id.in_(all_ol_ids),
+        ExecutionEntry.status == "signed",
+        ExecutionEntry.act_line_id.is_(None),
+    ).group_by(PlanEntry.order_line_id).all() if all_ol_ids else []
+    signed_qty_map = {r[0]: float(r[1]) for r in signed_rows}
+
     groups = []
     total_ordered = 0.0
     total_done = 0.0
@@ -560,19 +578,10 @@ def contracts_page(
         plan_sum_total = 0.0
         signed_sum_total = 0.0
         for ol in c.order_lines:
-            b = balance(session, ol.id)
-            unit = (ol.sum_ordered / ol.qty_ordered) if (ol.sum_ordered and ol.qty_ordered) else 0.0
-            pe_list = session.query(PlanEntry).filter(PlanEntry.order_line_id == ol.id).all()
-            plan_rub = sum(float(pe.plan_qty or 0.0) * unit for pe in pe_list)
-            pe_ids = [pe.id for pe in pe_list]
-            signed_rub = 0.0
-            if pe_ids:
-                signed_qty = session.query(func.coalesce(func.sum(ExecutionEntry.qty_fact), 0.0)).filter(
-                    ExecutionEntry.plan_entry_id.in_(pe_ids),
-                    ExecutionEntry.status == "signed",
-                    ExecutionEntry.act_line_id.is_(None),
-                ).scalar() or 0.0
-                signed_rub = float(signed_qty) * unit
+            b = balances_map.get(ol.id) or balance(session, ol.id)
+            u = unit_price(ol)
+            plan_rub = plan_qty_map.get(ol.id, 0.0) * u
+            signed_rub = signed_qty_map.get(ol.id, 0.0) * u
             rows.append({"ol": ol, "balance": b, "plan_rub": plan_rub, "signed_rub": signed_rub})
             ord_sum += float(ol.sum_ordered or 0.0)
             done_sum += float(b.sum_done or 0.0)
@@ -638,10 +647,7 @@ def execution_page(
         qset = qset.filter(OrderLine.contract_id == contract_id_int)
     entries = qset.order_by(OrderLine.contract_id, OrderLine.id).all()
 
-    def _unit_price(ol: OrderLine) -> float:
-        if ol.qty_ordered and ol.sum_ordered:
-            return ol.sum_ordered / ol.qty_ordered
-        return 0.0
+    _unit_price = unit_price
 
     groups: dict[int, dict] = {}
     totals = {"plan_qty": 0.0, "plan_sum": 0.0, "fact_qty": 0.0, "fact_sum": 0.0}
@@ -702,7 +708,7 @@ def upsert_execution(
         return float(s) if s else None
 
     ol = ex.plan_entry.order_line
-    unit = (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
+    unit = unit_price(ol)
 
     qty = _num(qty_fact)
     ex.qty_fact = qty
@@ -735,7 +741,7 @@ def sign_execution(
     session.commit()
 
     ol = ex.plan_entry.order_line
-    unit = (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
+    unit = unit_price(ol)
     plan_sum = (ex.plan_entry.plan_sum or 0.0) or (ex.plan_entry.plan_qty or 0.0) * unit
     return TEMPLATES.TemplateResponse(
         request, "partials/execution_row.html", {"ex": ex, "plan_sum": plan_sum},
@@ -758,7 +764,7 @@ def unsign_execution(
     session.commit()
 
     ol = ex.plan_entry.order_line
-    unit = (ol.sum_ordered / ol.qty_ordered) if (ol.qty_ordered and ol.sum_ordered) else 0.0
+    unit = unit_price(ol)
     plan_sum = (ex.plan_entry.plan_sum or 0.0) or (ex.plan_entry.plan_qty or 0.0) * unit
     return TEMPLATES.TemplateResponse(
         request, "partials/execution_row.html", {"ex": ex, "plan_sum": plan_sum},
