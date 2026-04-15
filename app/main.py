@@ -19,6 +19,7 @@ from app.db import init_db, make_session_factory
 from app.models import ActLine, Contract, ExecutionEntry, OrderLine, PlanEntry, WorkType
 from sqlalchemy.orm import joinedload
 from app.services.balances import balance
+from app.services import export as export_svc
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
@@ -62,6 +63,75 @@ app.add_middleware(BasicAuthMiddleware)
 @app.get("/healthz")
 def healthz():
     return JSONResponse({"ok": True})
+
+
+def _xlsx_response(data: bytes, filename: str) -> Response:
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/export/contracts.xlsx")
+def export_contracts_xlsx(
+    contract_id: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    s = SessionLocal()
+    try:
+        cid = int(contract_id) if contract_id else None
+        data = export_svc.export_contracts(s, contract_id=cid, q=q)
+    finally:
+        s.close()
+    return _xlsx_response(data, "contracts.xlsx")
+
+
+@app.get("/export/plan.xlsx")
+def export_plan_xlsx(
+    contract_id: Optional[str] = None,
+    q: Optional[str] = None,
+    start: Optional[str] = None,
+    n: int = Query(3, ge=1, le=12),
+):
+    s = SessionLocal()
+    try:
+        cid = int(contract_id) if contract_id else None
+        periods = next_periods(start or None, n=n)
+        data = export_svc.export_plan(s, periods=periods, contract_id=cid, q=q)
+    finally:
+        s.close()
+    return _xlsx_response(data, "plan.xlsx")
+
+
+@app.get("/export/execution.xlsx")
+def export_execution_xlsx(
+    period: Optional[str] = None,
+    contract_id: Optional[str] = None,
+):
+    s = SessionLocal()
+    try:
+        cid = int(contract_id) if contract_id else None
+        p = period or date.today().strftime("%Y-%m")
+        data = export_svc.export_execution(s, period=p, contract_id=cid)
+    finally:
+        s.close()
+    return _xlsx_response(data, f"execution-{p}.xlsx")
+
+
+@app.get("/export/dashboard.xlsx")
+def export_dashboard_xlsx(
+    start: Optional[str] = None,
+    n: int = Query(3, ge=1, le=24),
+    all: int = 0,
+):
+    s = SessionLocal()
+    try:
+        periods_filter = None if all else next_periods(start, n)
+        data = export_svc.export_dashboard(s, periods_filter=periods_filter)
+    finally:
+        s.close()
+    return _xlsx_response(data, "dashboard.xlsx")
 
 
 def get_session() -> Session:

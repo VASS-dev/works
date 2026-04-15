@@ -44,6 +44,7 @@
   </div>
   <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-2 font-medium shadow-sm">Применить</button>
   <a href="/contracts" class="text-sm text-slate-500 hover:underline">Сброс</a>
+  <a href="/export/contracts.xlsx?contract_id={{ contract_id or '' }}&q={{ q or '' }}" class="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md px-3 py-2 font-medium shadow-sm">Экспорт в Excel</a>
 </form>
 
 {% if not groups %}
