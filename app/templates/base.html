@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Планирование работ{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="bg-slate-100 text-slate-900 font-sans min-h-screen">
+  {% set path = request.url.path if request else '/' %}
+  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-6 py-3 flex items-center justify-between gap-6">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center text-sm font-bold shadow-sm">П</div>
+        <div class="min-w-0">
+          <div class="text-sm font-semibold leading-tight">План работ</div>
+          {% if period_labels %}<div class="text-[11px] text-slate-500 leading-tight">{{ period_labels[0] }} — {{ period_labels[-1] }} · {{ period_labels|length }} мес</div>{% endif %}
+        </div>
+      </div>
+      <nav class="text-sm flex gap-1 bg-slate-100 rounded-lg p-1">
+        {% set nav = [('/', 'План'), ('/execution', 'Исполнение'), ('/dashboard', 'Дашборд'), ('/contracts', 'Договоры')] %}
+        {% for href, label in nav %}
+          {% set active = (href == '/' and path == '/') or (href != '/' and path.startswith(href)) %}
+          <a href="{{ href }}" class="px-3 py-1.5 rounded-md font-medium transition {% if active %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+  </header>
+  <main class="max-w-[1600px] mx-auto px-6 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

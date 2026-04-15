@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% macro rub(v) %}{{ "{:,.0f}".format(v or 0).replace(",", " ") }} ₽{% endmacro %}
+{% block content %}
+
+<section class="mb-4 flex items-end justify-between gap-4 flex-wrap">
+  <div>
+    <h2 class="text-xl font-semibold text-slate-900">Договоры</h2>
+    <div class="text-xs text-slate-500">полный реестр работ по действующим договорам (только чтение)</div>
+  </div>
+  <div class="text-xs text-slate-500">
+    договоров: <span class="font-semibold text-slate-800">{{ groups|length }}</span>
+  </div>
+</section>
+
+<section class="mb-5 grid grid-cols-3 gap-3">
+  <div class="card px-4 py-3">
+    <div class="text-[11px] uppercase tracking-wide text-slate-500">Заказано</div>
+    <div class="text-xl font-semibold tabular-nums mt-0.5">{{ rub(total_ordered) }}</div>
+  </div>
+  <div class="card px-4 py-3">
+    <div class="text-[11px] uppercase tracking-wide text-slate-500">Выполнено</div>
+    <div class="text-xl font-semibold text-emerald-700 tabular-nums mt-0.5">{{ rub(total_done) }}</div>
+    <div class="text-[11px] text-slate-500 mt-1">{% if total_ordered %}{{ "%.0f"|format(total_done/total_ordered*100) }}% от заказанного{% endif %}</div>
+  </div>
+  <div class="card px-4 py-3">
+    <div class="text-[11px] uppercase tracking-wide text-slate-500">Остаток</div>
+    <div class="text-xl font-semibold text-amber-700 tabular-nums mt-0.5">{{ rub(total_remaining) }}</div>
+  </div>
+</section>
+
+<form method="get" action="/contracts" class="mb-4 flex gap-3 items-end card p-3">
+  <div class="flex-1">
+    <label class="block text-xs text-slate-500 mb-1">Поиск (№ заказа, № договора, контрагент, проект)</label>
+    <input name="q" value="{{ q }}" class="w-full border rounded px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Договор</label>
+    <select name="contract_id" class="border rounded px-2 py-2 text-sm w-64">
+      <option value="">— все —</option>
+      {% for c in contracts %}
+        <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>{{ c.number }} — {{ c.counterparty or "—" }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-2 font-medium shadow-sm">Применить</button>
+  <a href="/contracts" class="text-sm text-slate-500 hover:underline">Сброс</a>
+</form>
+
+{% if not groups %}
+  <div class="text-slate-500 text-sm py-10 text-center">Ничего не найдено.</div>
+{% endif %}
+
+{% for g in groups %}
+  {% set c = g.contract %}
+  {% set dp = (g.done_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
+  <details class="mb-3 card">
+    <summary class="cursor-pointer px-4 py-3 flex items-start gap-4 hover:bg-slate-50">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <span class="font-semibold text-slate-900">{{ c.counterparty or "—" }}</span>
+          {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono">{{ c.contract_no }}{% if c.contract_date %} · {{ c.contract_date.strftime('%d.%m.%Y') }}{% endif %}</span>{% endif %}
+        </div>
+        <div class="text-xs text-slate-600 truncate">{{ c.project or "" }}</div>
+      </div>
+      {% set sp = (g.signed_rub / g.ordered_rub * 100) if g.ordered_rub else 0 %}
+      <div class="hidden md:flex flex-col gap-1 w-72 shrink-0">
+        <div class="flex justify-between text-[11px] text-slate-500">
+          <span>заказано <span class="text-slate-800 font-medium tabular-nums">{{ rub(g.ordered_rub) }}</span></span>
+          <span>выполн. <span class="text-emerald-700 font-medium tabular-nums">{{ "%.0f"|format(dp) }}%</span></span>
+        </div>
+        <div class="relative w-full h-1.5 bg-slate-200 rounded-full overflow-hidden" title="выполнено {{ '%.0f'|format(dp) }}% · подписано {{ '%.0f'|format(sp) }}%">
+          <div class="absolute inset-y-0 left-0 bg-emerald-300" style="width: {{ dp if dp <= 100 else 100 }}%"></div>
+          <div class="absolute inset-y-0 left-0 bg-emerald-600" style="width: {{ sp if sp <= 100 else 100 }}%"></div>
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-400">
+          <span>план <span class="text-indigo-700 font-medium tabular-nums">{{ rub(g.plan_rub) }}</span></span>
+          <span>подпис. <span class="text-emerald-700 font-medium tabular-nums">{{ rub(g.signed_rub) }}</span></span>
+        </div>
+      </div>
+      <span class="text-xs text-slate-500 whitespace-nowrap">работ: {{ g.rows|length }}{% if g.closed_n %} · закрытых: {{ g.closed_n }}{% endif %}</span>
+    </summary>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-xs text-slate-600 border-t">
+          <tr>
+            <th class="text-left px-3 py-2 w-[38%]">Описание работы</th>
+            <th class="text-left px-2 py-2">Номенклатура</th>
+            <th class="text-right px-2 py-2">Заказано</th>
+            <th class="text-right px-2 py-2">Сумма, ₽</th>
+            <th class="text-right px-2 py-2">Выполнено</th>
+            <th class="text-right px-2 py-2">Остаток</th>
+            <th class="text-center px-2 py-2">Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in g.rows %}
+            {% set ol = r.ol %}
+            {% set b = r.balance %}
+            {% set closed = b.qty_remaining is not none and b.qty_remaining <= 0 %}
+            <tr class="border-t hover:bg-slate-50 {% if closed %}bg-slate-50/60 text-slate-500{% endif %}">
+              <td class="px-3 py-2 align-top">{{ ol.description }}</td>
+              <td class="px-2 py-2 align-top text-xs text-slate-600">{{ ol.work_type.name if ol.work_type else "—" }}</td>
+              <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ "%.2f"|format(ol.qty_ordered or 0) }}</td>
+              <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">{{ rub(ol.sum_ordered) }}</td>
+              <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                {{ "%.2f"|format(b.qty_done or 0) }}
+                <div class="text-[11px] text-slate-400">{{ rub(b.sum_done) }}</div>
+              </td>
+              <td class="px-2 py-2 text-right tabular-nums whitespace-nowrap {% if not closed %}text-amber-700{% endif %}">
+                {{ "%.2f"|format(b.qty_remaining or 0) }}
+                <div class="text-[11px] {% if not closed %}text-amber-600{% else %}text-slate-400{% endif %}">{{ rub(b.sum_remaining) }}</div>
+              </td>
+              <td class="px-2 py-2 text-center text-xs whitespace-nowrap">
+                {% if closed %}
+                  <span class="inline-block bg-slate-200 text-slate-600 rounded px-2 py-0.5">закрыта</span>
+                {% else %}
+                  <span class="inline-block bg-amber-100 text-amber-800 rounded px-2 py-0.5">в работе</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+{% endfor %}
+
+{% endblock %}

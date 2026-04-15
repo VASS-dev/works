@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Данные и аплоады (не коммитим в репозиторий)
+data/*.db
+data/uploads/
+*.xlsx
+
+# Секреты
+.env
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store

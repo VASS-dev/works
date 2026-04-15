@@ -1,0 +1,38 @@
+/* Base tweaks */
+body { -webkit-font-smoothing: antialiased; }
+
+/* HTMX transitions */
+tr.htmx-swapping { opacity: 0.4; transition: opacity 0.15s; }
+.htmx-request { opacity: 0.7; }
+
+/* Inputs */
+input[type="text"], input[type="number"], select {
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+input[type="text"]:focus, input[type="number"]:focus, select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Details disclosure arrow */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.2s;
+  color: #94a3b8;
+  font-size: 0.85em;
+}
+details[open] > summary::before { transform: rotate(90deg); color: #6366f1; }
+
+/* Card polish */
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03); }
+
+/* Table zebra + hover */
+tbody tr { transition: background 0.1s; }
+
+/* Button press feedback */
+button:active { transform: translateY(1px); }

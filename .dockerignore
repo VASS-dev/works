@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+.pytest_cache
+.git
+.gitignore
+.venv
+venv
+data/
+*.xlsx
+*.db
+.env
+.claude
+tests/

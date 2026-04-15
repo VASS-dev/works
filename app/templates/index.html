@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="mb-5 grid grid-cols-4 gap-4">
+  <div class="card p-4 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">📄</div>
+    <div class="min-w-0">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500">Договоров</div>
+      <div class="text-xl font-semibold">{{ groups|length }}</div>
+    </div>
+  </div>
+  <div class="card p-4 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-lg">≡</div>
+    <div class="min-w-0">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500">Строк работ</div>
+      <div class="text-xl font-semibold">{{ total_rows }}</div>
+    </div>
+  </div>
+  <div class="card p-4 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-lg">₽</div>
+    <div class="min-w-0">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500">Σ Заказано</div>
+      <div class="text-xl font-semibold tabular-nums">{{ "{:,.0f}".format(total_ordered).replace(",", " ") }}</div>
+    </div>
+  </div>
+  <div class="card p-4 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-lg">⏳</div>
+    <div class="min-w-0">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500">Σ Остаток</div>
+      <div class="text-xl font-semibold text-amber-700 tabular-nums">{{ "{:,.0f}".format(total_remaining).replace(",", " ") }}</div>
+    </div>
+  </div>
+</section>
+
+<form method="get" action="/" class="mb-4 flex gap-3 items-end card p-3">
+  <div class="flex-1">
+    <label class="block text-xs text-slate-500 mb-1">Поиск (договор, контрагент, работа)</label>
+    <input name="q" value="{{ q }}" placeholder="например: монтаж ЛО, или НФФР-003680"
+           class="w-full border rounded px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Договор</label>
+    <select name="contract_id" class="border rounded px-2 py-2 text-sm w-64">
+      <option value="">— все —</option>
+      {% for c in contracts %}
+        <option value="{{ c.id }}" {% if contract_id == c.id %}selected{% endif %}>
+          {{ c.number }} — {{ c.counterparty or "—" }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Старт (YYYY-MM)</label>
+    <div class="flex items-center gap-1">
+      <a href="?start={{ prev_start }}&n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="border rounded px-2 py-2 text-sm hover:bg-slate-100" title="Предыдущий месяц">←</a>
+      <input name="start" value="{{ start }}" placeholder="{{ today_period }}"
+             class="border rounded px-2 py-2 text-sm w-24">
+      <a href="?n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="border rounded px-2 py-2 text-sm hover:bg-slate-100" title="Сегодня">•</a>
+      <a href="?start={{ next_start }}&n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="border rounded px-2 py-2 text-sm hover:bg-slate-100" title="Следующий месяц">→</a>
+    </div>
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Горизонт</label>
+    <select name="n" class="border rounded px-2 py-2 text-sm">
+      {% for opt in [3, 6, 9, 12] %}
+        <option value="{{ opt }}" {% if n == opt %}selected{% endif %}>{{ opt }} мес</option>
+      {% endfor %}
+    </select>
+  </div>
+  <label class="flex items-center gap-2 text-sm text-slate-700 select-none">
+    <input type="checkbox" name="show_closed" value="1" {% if not hide_closed %}checked{% endif %}>
+    Показать закрытые
+  </label>
+  <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md px-4 py-2 font-medium shadow-sm">Применить</button>
+  <a href="/" class="text-sm text-slate-500 hover:underline">Сброс</a>
+</form>
+
+{% if hide_closed and hidden_closed %}
+<div class="mb-3 text-xs text-slate-500">
+  Скрыто закрытых строк (остаток = 0): <span class="font-medium text-slate-700">{{ hidden_closed }}</span>.
+  <a href="?show_closed=1&n={{ n }}{% if contract_id %}&contract_id={{ contract_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if start %}&start={{ start }}{% endif %}" class="text-slate-600 hover:underline">Показать все</a>
+</div>
+{% endif %}
+
+<section class="mb-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+  {% for p in periods %}
+    {% set st = period_stats[p] %}
+    {% set lbl = period_labels[loop.index0] %}
+    {% set fully_approved = st.total > 0 and st.draft == 0 %}
+    <div class="bg-white border rounded p-3 flex items-center gap-3 {% if fully_approved %}border-emerald-300 bg-emerald-50{% endif %}">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-slate-800">{{ lbl }}</div>
+        <div class="text-xs text-slate-500">
+          черновик: <span class="font-medium text-slate-700">{{ st.draft }}</span>
+          · утверждено: <span class="font-medium text-emerald-700">{{ st.approved }}</span>
+        </div>
+      </div>
+      {% if st.draft > 0 %}
+        <form hx-post="/api/plan/approve" hx-confirm="Утвердить все черновики плана за {{ lbl }}? После утверждения правки будут заблокированы." hx-swap="none" hx-on::after-request="window.location.reload()">
+          <input type="hidden" name="period" value="{{ p }}">
+          <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1.5 font-medium">🔒 Утвердить</button>
+        </form>
+      {% elif st.approved > 0 %}
+        <form hx-post="/api/plan/unfreeze" hx-confirm="Снять утверждение за {{ lbl }}? Записи снова станут редактируемыми." hx-swap="none" hx-on::after-request="window.location.reload()">
+          <input type="hidden" name="period" value="{{ p }}">
+          <button class="text-xs border border-emerald-600 text-emerald-700 hover:bg-emerald-100 rounded px-3 py-1.5 font-medium">🔓 Снять</button>
+        </form>
+      {% else %}
+        <span class="text-xs text-slate-400">нет данных</span>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+
+{% if not groups %}
+  <div class="text-slate-500 text-sm py-10 text-center">Ничего не найдено.</div>
+{% endif %}
+
+{% for group in groups %}
+  {% set c = group.contract %}
+  {% set gord = group.ordered_rub %}
+  {% set gdone = group.done_rub %}
+  {% set gsigned = group.signed_rub %}
+  {% set dp = (gdone / gord * 100) if gord else 0 %}
+  {% set sp = (gsigned / gord * 100) if gord else 0 %}
+  {% if dp > 100 %}{% set dp = 100 %}{% endif %}
+  {% if sp > 100 %}{% set sp = 100 %}{% endif %}
+  <details class="mb-3 card">
+    <summary class="cursor-pointer px-4 py-3 flex items-center gap-4 hover:bg-slate-50">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <span class="font-semibold text-slate-900">{{ c.counterparty or "—" }}</span>
+          {% if c.contract_no %}<span class="text-xs text-slate-400 font-mono">{{ c.contract_no }}</span>{% endif %}
+        </div>
+        <div class="text-xs text-slate-600 truncate">{{ c.project or "" }}</div>
+      </div>
+      <div class="hidden md:flex flex-col gap-1 w-64 shrink-0">
+        <div class="flex justify-between text-[11px] text-slate-500">
+          <span>план <span class="text-slate-800 font-medium tabular-nums">{{ "{:,.0f}".format(gord).replace(",", " ") }} ₽</span></span>
+          <span>закрыто <span class="text-emerald-700 font-medium tabular-nums">{{ "%.0f"|format(dp) }}%</span></span>
+        </div>
+        <div class="relative w-full h-1.5 bg-slate-200 rounded-full overflow-hidden" title="закрыто {{ '%.0f'|format(dp) }}% · подписано {{ '%.0f'|format(sp) }}%">
+          <div class="absolute inset-y-0 left-0 bg-emerald-300" style="width: {{ dp }}%"></div>
+          <div class="absolute inset-y-0 left-0 bg-emerald-600" style="width: {{ sp }}%"></div>
+        </div>
+      </div>
+      <span class="text-xs text-slate-500 whitespace-nowrap">строк: {{ group.rows|length }}</span>
+    </summary>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-100 text-xs text-slate-600">
+        <tr>
+          <th class="text-left px-3 py-2 w-[28%]">Вид работ / описание</th>
+          <th class="text-right px-2 py-2">Заказано</th>
+          <th class="text-right px-2 py-2">Выполнено</th>
+          <th class="text-right px-2 py-2">Остаток</th>
+          {% for lbl in period_labels %}
+            <th class="text-right px-2 py-2 bg-blue-50">{{ lbl }}</th>
+          {% endfor %}
+          <th class="text-right px-2 py-2">Σ осталось<br>по плану</th>
+          <th class="text-right px-2 py-2">% от<br>остатка</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in group.rows %}
+          {% include "partials/row.html" %}
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+{% endfor %}
+
+{% endblock %}
