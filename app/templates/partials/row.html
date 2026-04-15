@@ -1,6 +1,7 @@
 {% set ol = row.ol %}
 {% set b = row.balance %}
 {% set over = (row.plan_sum or 0) > (b.qty_remaining or 0) if b.qty_remaining is not none else false %}
+{% set unit_price = (ol.sum_ordered / ol.qty_ordered) if (ol.sum_ordered and ol.qty_ordered) else 0 %}
 <tr id="row-{{ ol.id }}" class="border-t hover:bg-slate-50">
   <td class="px-3 py-2 align-top">
     <div class="text-slate-800">{{ ol.description }}</div>
@@ -31,6 +32,11 @@
           <span>🔒</span>
           <span>{% if val is not none %}{{ '%.2f'|format(val) }}{% endif %}</span>
         </div>
+        {% if val is not none and unit_price %}
+          <div class="w-24 text-right tabular-nums px-2 text-[11px] text-slate-500">
+            {{ "{:,.0f}".format(val * unit_price).replace(",", " ") }} ₽
+          </div>
+        {% endif %}
         {% if fv is not none %}
           <div class="w-24 text-right tabular-nums px-2 text-[11px] {% if fs %}text-emerald-700 font-medium{% else %}text-slate-500{% endif %}" title="{% if fs %}Подписано{% else %}Факт (черновик){% endif %}">
             {% if fs %}🔒 {% endif %}факт: {{ '%.2f'|format(fv) }}
@@ -47,6 +53,11 @@
                  inputmode="decimal"
                  class="w-24 text-right tabular-nums border rounded px-2 py-1 text-sm bg-white focus:bg-yellow-50 focus:outline-blue-400">
         </form>
+        {% if val is not none and unit_price %}
+          <div class="w-24 text-right tabular-nums px-2 text-[11px] text-slate-500">
+            {{ "{:,.0f}".format(val * unit_price).replace(",", " ") }} ₽
+          </div>
+        {% endif %}
       {% endif %}
       </div>
     </td>
