@@ -195,14 +195,17 @@ def forms_page(request: Request):
 @app.get("/export/form/work_order")
 def export_form_work_order(
     period: str = Query(...),
-    contract_id: str = Query(...),
+    contract_id: Optional[str] = None,
 ):
     s = SessionLocal()
     try:
-        cid = int(contract_id)
+        cid = int(contract_id) if contract_id and contract_id.strip() else None
         data = forms_svc.export_work_order(s, period=period, contract_id=cid)
-        c = s.get(Contract, cid)
-        name = (c.contract_no or c.number or "zadanie").replace("/", "-")
+        if cid is not None:
+            c = s.get(Contract, cid)
+            name = (c.contract_no or c.number or "zadanie").replace("/", "-")
+        else:
+            name = "vse"
     finally:
         s.close()
     return _xlsx_response(data, f"zadanie-{name}-{period}.xlsx")
@@ -215,7 +218,7 @@ def export_form_monthly_plan(
 ):
     s = SessionLocal()
     try:
-        cid = int(contract_id) if contract_id else None
+        cid = int(contract_id) if contract_id and contract_id.strip() else None
         data = forms_svc.export_monthly_plan_form(s, period=period, contract_id=cid)
     finally:
         s.close()
@@ -229,7 +232,7 @@ def export_form_progress_report(
 ):
     s = SessionLocal()
     try:
-        cid = int(contract_id) if contract_id else None
+        cid = int(contract_id) if contract_id and contract_id.strip() else None
         data = forms_svc.export_progress_report(s, period=period, contract_id=cid)
     finally:
         s.close()

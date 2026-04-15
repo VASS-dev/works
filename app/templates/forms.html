@@ -24,9 +24,9 @@
                class="border rounded px-2 py-1.5 text-sm">
       </div>
       <div>
-        <label class="block text-xs text-slate-500 mb-1">Договор (обязательно)</label>
-        <select name="contract_id" required class="border rounded px-2 py-1.5 text-sm w-80">
-          <option value="">— выберите договор —</option>
+        <label class="block text-xs text-slate-500 mb-1">Договор (необязательно)</label>
+        <select name="contract_id" class="border rounded px-2 py-1.5 text-sm w-80">
+          <option value="">— все договоры —</option>
           {% for c in contracts %}
             <option value="{{ c.id }}">{{ c.counterparty or "—" }} — {{ c.contract_no or c.number }}</option>
           {% endfor %}

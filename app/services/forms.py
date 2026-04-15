@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 from io import BytesIO
 from typing import Optional
 
@@ -14,7 +15,7 @@ from openpyxl.utils import get_column_letter
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Contract, ExecutionEntry, OrderLine, PlanEntry
-from app.services.balances import balance as get_balance, balance_bulk
+from app.services.balances import balance_bulk
 from app.services.pricing import unit_price
 from app.services.statuses import ExecutionStatus
 
@@ -116,22 +117,17 @@ def _finish(wb: Workbook) -> bytes:
 # ФОРМА 1: Задание на производство работ
 # ─────────────────────────────────────────────────────────────────────────────
 
-def export_work_order(session: Session, period: str, contract_id: int) -> bytes:
-    """Задание на производство работ по конкретному договору и месяцу.
-
-    Выдаётся прорабу/подрядчику. Содержит:
-    - Мета-блок (подрядчик, объект, договор, период)
-    - Таблицу работ (кол-во по договору, выполнено, остаток, план на месяц, сумма)
-    - Строку итогов
-    - Блок подписей
-    """
-    contract = session.get(Contract, contract_id)
-    if contract is None:
-        raise ValueError(f"Договор {contract_id} не найден")
+def _build_work_order_sheet(wb: Workbook, ws, session: Session,
+                             contract: Contract, period: str) -> None:
+    """Заполняет лист ws данными задания на производство работ для одного договора."""
+    N = 9
+    widths = [4, 42, 7, 9, 9, 9, 10, 13, 13]
+    for i, w in enumerate(widths, 1):
+        _col_w(ws, i, w)
 
     ols = (
         session.query(OrderLine)
-        .filter(OrderLine.contract_id == contract_id)
+        .filter(OrderLine.contract_id == contract.id)
         .options(selectinload(OrderLine.work_type))
         .order_by(OrderLine.id)
         .all()
@@ -145,24 +141,12 @@ def export_work_order(session: Session, period: str, contract_id: int) -> bytes:
     }
     balances = balance_bulk(session, [ol.id for ol in ols])
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Задание"
-    N = 9  # кол-во колонок
-
-    # ── Ширины колонок ──────────────────────────────────────────────
-    widths = [4, 42, 7, 9, 9, 9, 10, 13, 13]
-    for i, w in enumerate(widths, 1):
-        _col_w(ws, i, w)
-
     # ── Шапка документа ─────────────────────────────────────────────
     _row_h(ws, 1, 4)
     _row_h(ws, 2, 28)
     _merge(ws, 2, 1, 2, N, "ЗАДАНИЕ НА ПРОИЗВОДСТВО РАБОТ", bold=True, size=14)
-
     _row_h(ws, 3, 16)
     _merge(ws, 3, 1, 3, N, _period_ru(period).upper(), bold=False, size=11)
-
     _row_h(ws, 4, 6)
 
     def meta(row, label, value):
@@ -177,7 +161,6 @@ def export_work_order(session: Session, period: str, contract_id: int) -> bytes:
     meta(5, "Подрядчик:", contract.counterparty)
     meta(6, "Объект:", contract.project)
     meta(7, "Договор №:", contract_ref)
-
     _row_h(ws, 8, 6)
 
     # ── Заголовок таблицы ────────────────────────────────────────────
@@ -211,7 +194,6 @@ def export_work_order(session: Session, period: str, contract_id: int) -> bytes:
 
         unit_name = (ol.work_type.unit if ol.work_type and ol.work_type.unit else "—")
 
-        _row_h(ws, r, 13)
         _cell(ws, r, 1, n, h_align="center")
         _cell(ws, r, 2, ol.description, h_align="left", wrap=True)
         _cell(ws, r, 3, unit_name, h_align="center")
@@ -230,19 +212,17 @@ def export_work_order(session: Session, period: str, contract_id: int) -> bytes:
     _cell(ws, r, 7, round(total_qty, 2), bold=True, h_align="right", fill=_FILL_TOTAL, num_fmt="#,##0.00")
     _cell(ws, r, 8, None, fill=_FILL_TOTAL)
     _cell(ws, r, 9, round(total_sum, 2), bold=True, h_align="right", fill=_FILL_TOTAL, num_fmt="#,##0.00")
-
     r += 2
 
     # ── Блок подписей ─────────────────────────────────────────────────
     def sig_line(row, label):
         _row_h(ws, row, 22)
         _merge(ws, row, 1, row, 3, label, bold=False, size=10, h_align="left")
-        # Подпись: должность / ФИО / дата
         for col, text in [(4, "должность"), (6, "ФИО"), (8, "дата")]:
             ws.cell(row=row, column=col, value=text).font = Font(size=8, name=_ARIAL, italic=True, color="808080")
             ws.cell(row=row, column=col).alignment = Alignment(horizontal="center", vertical="bottom")
             ws.cell(row=row, column=col).border = Border(bottom=_T)
-        ws.column_dimensions[get_column_letter(5)].width = 1   # разделитель /
+        ws.column_dimensions[get_column_letter(5)].width = 1
         ws.cell(row=row, column=5, value="/").alignment = Alignment(horizontal="center", vertical="center")
         ws.cell(row=row, column=7, value="/").alignment = Alignment(horizontal="center", vertical="center")
 
@@ -257,6 +237,48 @@ def export_work_order(session: Session, period: str, contract_id: int) -> bytes:
     _a4(ws, landscape=False)
     ws.print_title_rows = "9:9"
     ws.freeze_panes = "A10"
+
+
+def export_work_order(session: Session, period: str,
+                      contract_id: Optional[int] = None) -> bytes:
+    """Задание на производство работ.
+
+    Если contract_id указан — один лист для этого договора.
+    Если None — один лист на каждый договор, у которого есть план на период.
+    """
+    if contract_id is not None:
+        contracts = [session.get(Contract, contract_id)]
+        if contracts[0] is None:
+            raise ValueError(f"Договор {contract_id} не найден")
+    else:
+        # Найти все договоры, у которых есть PlanEntry на период
+        contract_ids = (
+            session.query(OrderLine.contract_id)
+            .join(PlanEntry, PlanEntry.order_line_id == OrderLine.id)
+            .filter(PlanEntry.period == period, PlanEntry.plan_qty.isnot(None))
+            .distinct()
+            .all()
+        )
+        cids = [row[0] for row in contract_ids]
+        contracts = (
+            session.query(Contract)
+            .filter(Contract.id.in_(cids))
+            .order_by(Contract.counterparty)
+            .all()
+        )
+
+    wb = Workbook()
+    first = True
+    for contract in contracts:
+        if first:
+            ws = wb.active
+            first = False
+        else:
+            ws = wb.create_sheet()
+        # Название листа — первые 31 символа counterparty (ограничение Excel)
+        sheet_name = (contract.counterparty or contract.number or str(contract.id))[:31]
+        ws.title = sheet_name
+        _build_work_order_sheet(wb, ws, session, contract, period)
 
     return _finish(wb)
 
@@ -291,7 +313,7 @@ def export_monthly_plan_form(session: Session, period: str,
     entries = qset.all()
 
     # Группировка по договору
-    from collections import OrderedDict
+
     groups: dict[int, list[PlanEntry]] = OrderedDict()
     for pe in entries:
         cid = pe.order_line.contract_id
@@ -356,7 +378,6 @@ def export_monthly_plan_form(session: Session, period: str,
             group_sum += s
             status_label = "утверждён" if pe.status == "approved" else "черновик"
 
-            _row_h(ws, r, 13)
             _cell(ws, r, 1, n_global, h_align="center")
             _cell(ws, r, 2, ol.description, h_align="left", wrap=True)
             _cell(ws, r, 3, c.project or "", h_align="left", wrap=True)
@@ -430,7 +451,7 @@ def export_progress_report(session: Session, period: str,
     entries = qset.all()
 
     # Группировка по договору
-    from collections import OrderedDict
+
     groups: dict[int, list[ExecutionEntry]] = OrderedDict()
     for ex in entries:
         cid = ex.plan_entry.order_line.contract_id
@@ -497,7 +518,6 @@ def export_progress_report(session: Session, period: str,
             g_pq += plan_qty; g_ps += plan_sum
             g_fq += fact_qty; g_fs += fact_sum
 
-            _row_h(ws, r, 13)
             _cell(ws, r, 1, n_global, h_align="center", fill=row_fill)
             _cell(ws, r, 2, ol.description, h_align="left", wrap=True, fill=row_fill)
             _cell(ws, r, 3, c.project or "", h_align="left", wrap=True, fill=row_fill)
