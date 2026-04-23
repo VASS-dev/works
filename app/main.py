@@ -727,6 +727,31 @@ def contracts_page(
     )
 
 
+@app.delete("/api/contracts/{contract_id}")
+def delete_contract(contract_id: int, session: Session = Depends(get_session)):
+    contract = session.get(Contract, contract_id)
+    if contract is None:
+        raise HTTPException(status_code=404, detail="Договор не найден")
+
+    # 1. Найти все plan_entry_id по этому договору
+    ol_ids = [ol.id for ol in contract.order_lines]
+    if ol_ids:
+        pe_ids = [
+            row[0] for row in
+            session.query(PlanEntry.id).filter(PlanEntry.order_line_id.in_(ol_ids)).all()
+        ]
+        # 2. Удалить ExecutionEntry (нет cascade от PlanEntry)
+        if pe_ids:
+            session.query(ExecutionEntry).filter(
+                ExecutionEntry.plan_entry_id.in_(pe_ids)
+            ).delete(synchronize_session=False)
+
+    # 3. Удалить договор — cascade уберёт OrderLine, PlanEntry, Act, ActLine
+    session.delete(contract)
+    session.commit()
+    return {"ok": True}
+
+
 @app.get("/execution", response_class=HTMLResponse)
 def execution_page(
     request: Request,

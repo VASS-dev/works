@@ -64,6 +64,13 @@
         </div>
       </div>
       <span class="text-xs text-slate-400 whitespace-nowrap text-right w-36 shrink-0">{{ g.rows|length }} работ{% if g.closed_n %} · {{ g.closed_n }} закрыт.{% endif %}</span>
+      <button type="button"
+              hx-delete="/api/contracts/{{ c.id }}"
+              hx-confirm="Удалить договор «{{ c.counterparty or c.number }}»? Будут удалены все работы, планы и акты по этому договору. Это действие нельзя отменить."
+              hx-target="closest details"
+              hx-swap="outerHTML"
+              onclick="event.stopPropagation()"
+              class="shrink-0 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-400 rounded px-2 py-1 font-medium transition">Удалить</button>
     </summary>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
